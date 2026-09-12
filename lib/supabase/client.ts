@@ -16,6 +16,7 @@ export function getSupabaseBrowserClient() {
   if (!client) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-project.supabase.co'
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+    client = createBrowserClient(url, anonKey)
     const token = getStoredDeviceToken()
 
     client = createBrowserClient(url, anonKey, {

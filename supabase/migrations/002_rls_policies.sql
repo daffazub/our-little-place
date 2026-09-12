@@ -64,6 +64,7 @@ ALTER TABLE music_tracks     ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 -- ROOMS policies
 -- ============================================================
+-- Allow reading if device is a member of that room
 -- Allow reading if device is a member of that room OR room has an active invite link
 CREATE POLICY "rooms_select_member" ON rooms
   FOR SELECT USING (
