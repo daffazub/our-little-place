@@ -51,16 +51,30 @@ export default function RoomNavbar() {
         token = await generateInviteToken(roomId, session.id)
       }
 
-      if (token) {
+      if (token && typeof window !== 'undefined') {
         const inviteUrl = `${window.location.origin}/join/${roomId}/${token}`
-        if (navigator.clipboard) {
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: `Undangan Bergabung ke ${roomName}`,
+              text: `Yuk gabung ke ruang kenangan kita "${roomName}":`,
+              url: inviteUrl,
+            })
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2500)
+            return
+          } catch {
+            // If user closed share dialog, fallback to copy
+          }
+        }
+        if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(inviteUrl)
           setCopied(true)
           setTimeout(() => setCopied(false), 2500)
         }
       }
     } catch (err) {
-      console.error('Failed to copy invite token:', err)
+      console.error('Failed to share invite token:', err)
     } finally {
       setIsSharing(false)
     }

@@ -64,10 +64,15 @@ ALTER TABLE music_tracks     ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 -- ROOMS policies
 -- ============================================================
--- Allow reading if device is a member of that room
+-- Allow reading if device is a member of that room OR room has an active invite link
 CREATE POLICY "rooms_select_member" ON rooms
   FOR SELECT USING (
     is_room_member(id, current_setting('request.headers', true)::json->>'x-device-token')
+    OR EXISTS (
+      SELECT 1 FROM invite_tokens t
+      WHERE t.room_id = id
+        AND t.revoked = false
+    )
   );
 
 -- Allow create (used when creating room — no check needed yet)
@@ -88,9 +93,6 @@ CREATE POLICY "members_select_room" ON members
     is_room_member(room_id, current_setting('request.headers', true)::json->>'x-device-token')
   );
 
--- Allow insert (joining a room / creating a room)
-CREATE POLICY "members_insert_all" ON members
-  FOR INSERT WITH CHECK (true);
 -- Allow insert: owner only if room is brand new; contributor only if active invite token exists
 CREATE POLICY "members_insert_first_owner" ON members
   FOR INSERT WITH CHECK (
@@ -390,10 +392,6 @@ CREATE POLICY "comments_delete" ON comments FOR DELETE USING (
   )
 );
 
--- ============================================================
--- INVITE TOKENS
--- ============================================================
-CREATE POLICY "invite_tokens_select" ON invite_tokens FOR SELECT USING (true);  -- Public read for validation
 -- Only room members can list invite tokens, or anon can query active (non-revoked) tokens
 CREATE POLICY "invite_tokens_select" ON invite_tokens FOR SELECT USING (
   is_room_member(room_id, current_setting('request.headers', true)::json->>'x-device-token')
@@ -402,6 +400,10 @@ CREATE POLICY "invite_tokens_select" ON invite_tokens FOR SELECT USING (
 
 CREATE POLICY "invite_tokens_insert" ON invite_tokens FOR INSERT WITH CHECK (
   is_room_member(room_id, current_setting('request.headers', true)::json->>'x-device-token')
+  OR NOT EXISTS (
+    SELECT 1 FROM invite_tokens t
+    WHERE t.room_id = invite_tokens.room_id
+  )
 );
 
 CREATE POLICY "invite_tokens_update_revoke" ON invite_tokens FOR UPDATE USING (
@@ -421,4 +423,110 @@ CREATE POLICY "music_tracks_delete" ON music_tracks FOR DELETE USING (
   created_by = get_member_id(room_id, current_setting('request.headers', true)::json->>'x-device-token')
   OR is_room_owner(room_id, current_setting('request.headers', true)::json->>'x-device-token')
 );
+
+-- ============================================================
+-- ATOMIC RPC FUNCTIONS (SECURITY DEFINER)
+-- ============================================================
+
+-- Validate an invite token safely without exposing table rows
+CREATE OR REPLACE FUNCTION validate_room_invite(p_room_id UUID, p_token TEXT)
+RETURNS TABLE (
+  valid BOOLEAN,
+  room_id UUID,
+  room_name TEXT
+) AS $$
+  SELECT
+    true AS valid,
+    r.id AS room_id,
+    r.name AS room_name
+  FROM invite_tokens t
+  JOIN rooms r ON r.id = t.room_id
+  WHERE t.room_id = p_room_id
+    AND t.token = p_token
+    AND t.revoked = false
+  LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER STABLE;
+
+-- Atomic room creation: creates room, member, sets owner_id, and creates first token in 1 tx
+CREATE OR REPLACE FUNCTION create_room_with_owner(
+  p_room_name TEXT,
+  p_owner_name TEXT,
+  p_avatar_url TEXT,
+  p_device_token TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_room rooms%ROWTYPE;
+  v_member members%ROWTYPE;
+  v_token invite_tokens%ROWTYPE;
+BEGIN
+  -- 1. Insert room
+  INSERT INTO rooms (name) VALUES (p_room_name) RETURNING * INTO v_room;
+
+  -- 2. Insert owner member
+  INSERT INTO members (room_id, name, avatar_url, role, device_token)
+  VALUES (v_room.id, p_owner_name, p_avatar_url, 'owner', p_device_token)
+  RETURNING * INTO v_member;
+
+  -- 3. Update room owner_id
+  UPDATE rooms SET owner_id = v_member.id WHERE id = v_room.id;
+  v_room.owner_id := v_member.id;
+
+  -- 4. Create initial invite token
+  INSERT INTO invite_tokens (room_id, created_by)
+  VALUES (v_room.id, v_member.id)
+  RETURNING * INTO v_token;
+
+  RETURN jsonb_build_object(
+    'member', to_jsonb(v_member),
+    'room', to_jsonb(v_room),
+    'invite_token', v_token.token
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Atomic join: validates token and inserts contributor member in 1 tx
+CREATE OR REPLACE FUNCTION join_room_with_invite(
+  p_room_id UUID,
+  p_invite_token TEXT,
+  p_name TEXT,
+  p_avatar_url TEXT,
+  p_device_token TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_room rooms%ROWTYPE;
+  v_member members%ROWTYPE;
+  v_token_id UUID;
+BEGIN
+  -- 1. Validate invite token
+  SELECT id INTO v_token_id
+  FROM invite_tokens
+  WHERE room_id = p_room_id
+    AND token = p_invite_token
+    AND revoked = false
+  LIMIT 1;
+
+  IF v_token_id IS NULL THEN
+    RAISE EXCEPTION 'Link undangan tidak valid atau sudah kadaluarsa.';
+  END IF;
+
+  -- 2. Verify room exists
+  SELECT * INTO v_room FROM rooms WHERE id = p_room_id;
+  IF v_room.id IS NULL THEN
+    RAISE EXCEPTION 'Room tidak ditemukan.';
+  END IF;
+
+  -- 3. Insert new member as contributor
+  INSERT INTO members (room_id, name, avatar_url, role, device_token)
+  VALUES (p_room_id, p_name, p_avatar_url, 'contributor', p_device_token)
+  RETURNING * INTO v_member;
+
+  RETURN jsonb_build_object(
+    'member', to_jsonb(v_member),
+    'room', to_jsonb(v_room)
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 

@@ -34,21 +34,54 @@ export default function JoinRoomPage() {
   useEffect(() => {
     async function validate() {
       setIsValidating(true)
-      const { data: tokenRow } = await supabase
-        .from('invite_tokens')
-        .select('*, room:rooms(*)')
-        .eq('room_id', params.roomId)
-        .eq('token', params.token)
-        .eq('revoked', false)
-        .single()
+      try {
+        // Try RPC first (bypasses RLS deadlocks cleanly)
+        const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('validate_room_invite', {
+          p_room_id: params.roomId,
+          p_token: params.token,
+        })
 
-      if (tokenRow?.room) {
-        setRoom(tokenRow.room as unknown as Room)
-        setTokenValid(true)
-      } else {
+        if (!rpcError && rpcData && rpcData.length > 0 && rpcData[0].valid) {
+          setRoom({
+            id: rpcData[0].room_id,
+            name: rpcData[0].room_name,
+            owner_id: null,
+            created_at: new Date().toISOString(),
+          })
+          setTokenValid(true)
+          setIsValidating(false)
+          return
+        }
+
+        // Direct query fallback
+        const { data: tokenRow } = await supabase
+          .from('invite_tokens')
+          .select('*, room:rooms(*)')
+          .eq('room_id', params.roomId)
+          .eq('token', params.token)
+          .eq('revoked', false)
+          .maybeSingle()
+
+        if (tokenRow?.room) {
+          setRoom(tokenRow.room as unknown as Room)
+          setTokenValid(true)
+        } else if (tokenRow && !tokenRow.revoked) {
+          const { data: roomData } = await supabase
+            .from('rooms')
+            .select('*')
+            .eq('id', params.roomId)
+            .maybeSingle()
+
+          setRoom((roomData as Room) || { id: params.roomId, name: 'Tempat Kenangan', owner_id: null, created_at: '' })
+          setTokenValid(true)
+        } else {
+          setTokenValid(false)
+        }
+      } catch {
         setTokenValid(false)
+      } finally {
+        setIsValidating(false)
       }
-      setIsValidating(false)
     }
     if (params.roomId && params.token) validate()
   }, [params.roomId, params.token])

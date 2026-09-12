@@ -50,7 +50,7 @@ export default function CreateRoomPage() {
       setSession(session)
       router.push(`/room/${session.room_id}`)
     } catch (err) {
-      setErrors({ general: 'Gagal membuat room. Cek koneksi internet kamu.' })
+      setErrors({ general: err instanceof Error ? err.message : 'Gagal membuat room. Cek koneksi internet kamu.' })
     } finally {
       setIsLoading(false)
     }

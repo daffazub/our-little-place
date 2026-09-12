@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
 import { supabase } from '@/lib/supabase/client'
+import { getMediaUrl } from '@/lib/storage'
 import type { Memory, Story, Plan, Member } from '@/types/database'
 
 export default function RoomDashboardPage() {
@@ -209,7 +210,7 @@ export default function RoomDashboardPage() {
                     >
                       {cover ? (
                         <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${cover}`}
+                          src={getMediaUrl(cover, 'photos')}
                           alt={memory.title}
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />

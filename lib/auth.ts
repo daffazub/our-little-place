@@ -1,6 +1,6 @@
 'use client'
 
-import { supabase } from './supabase/client'
+import { supabase, setSupabaseDeviceToken } from './supabase/client'
 import type { Member, Room, SessionMember } from '@/types/database'
 
 // ─── Keys for localStorage / cookie ───────────────────────────
@@ -14,14 +14,15 @@ function generateDeviceToken(): string {
   return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// ─── Persist device_token in both localStorage AND cookie ─────
-// (cookie is read by the server client for RLS)
+// ─── Persist device_token in localStorage, cookie, and client headers
 function saveDeviceToken(token: string) {
-  localStorage.setItem(DEVICE_TOKEN_KEY, token)
-  document.cookie = `olp_device_token=${token}; path=/; SameSite=Lax; max-age=31536000`
-  const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
-  const secureFlag = isSecure ? '; Secure' : ''
-  document.cookie = `olp_device_token=${token}; path=/; SameSite=Lax; max-age=31536000${secureFlag}`
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(DEVICE_TOKEN_KEY, token)
+    const isSecure = window.location.protocol === 'https:'
+    const secureFlag = isSecure ? '; Secure' : ''
+    document.cookie = `olp_device_token=${token}; path=/; SameSite=Lax; max-age=31536000${secureFlag}`
+  }
+  setSupabaseDeviceToken(token)
 }
 
 export function getDeviceToken(): string | null {
@@ -31,7 +32,10 @@ export function getDeviceToken(): string | null {
 
 // ─── Save/load full session ────────────────────────────────────
 export function saveSession(session: SessionMember) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  }
+  setSupabaseDeviceToken(session.device_token)
 }
 
 export function loadSession(): SessionMember | null {
@@ -46,12 +50,14 @@ export function loadSession(): SessionMember | null {
 }
 
 export function clearSession() {
-  localStorage.removeItem(DEVICE_TOKEN_KEY)
-  localStorage.removeItem(SESSION_KEY)
-  document.cookie = 'olp_device_token=; path=/; max-age=0'
-  const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
-  const secureFlag = isSecure ? '; Secure' : ''
-  document.cookie = `olp_device_token=; path=/; max-age=0; SameSite=Lax${secureFlag}`
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(DEVICE_TOKEN_KEY)
+    localStorage.removeItem(SESSION_KEY)
+    const isSecure = window.location.protocol === 'https:'
+    const secureFlag = isSecure ? '; Secure' : ''
+    document.cookie = `olp_device_token=; path=/; max-age=0; SameSite=Lax${secureFlag}`
+  }
+  setSupabaseDeviceToken('')
 }
 
 // ─── Create new room + owner member ───────────────────────────
@@ -63,6 +69,28 @@ export async function createRoom(
   const deviceToken = generateDeviceToken()
   saveDeviceToken(deviceToken)
 
+  // Try RPC first for atomic transaction if available
+  try {
+    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('create_room_with_owner', {
+      p_room_name: roomName,
+      p_owner_name: ownerName,
+      p_avatar_url: avatarUrl ?? null,
+      p_device_token: deviceToken,
+    })
+
+    if (!rpcError && rpcData?.room && rpcData?.member) {
+      const session: SessionMember = {
+        ...rpcData.member,
+        room: rpcData.room,
+      }
+      saveSession(session)
+      return session
+    }
+  } catch {
+    // Fall back to direct queries below
+  }
+
+  // Direct queries fallback
   // 1. Insert room (owner_id set after we have member id)
   const { data: room, error: roomError } = await supabase
     .from('rooms')
@@ -105,6 +133,32 @@ export async function joinRoom(
   memberName: string,
   avatarUrl?: string
 ): Promise<SessionMember> {
+  const deviceToken = generateDeviceToken()
+  saveDeviceToken(deviceToken)
+
+  // Try RPC first for atomic transaction
+  try {
+    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('join_room_with_invite', {
+      p_room_id: roomId,
+      p_invite_token: inviteToken,
+      p_name: memberName,
+      p_avatar_url: avatarUrl ?? null,
+      p_device_token: deviceToken,
+    })
+
+    if (!rpcError && rpcData?.room && rpcData?.member) {
+      const session: SessionMember = {
+        ...rpcData.member,
+        room: rpcData.room,
+      }
+      saveSession(session)
+      return session
+    }
+  } catch {
+    // Fall back to direct queries below
+  }
+
+  // Direct queries fallback
   // 1. Validate token
   const { data: tokenRow, error: tokenError } = await supabase
     .from('invite_tokens')
@@ -125,11 +179,7 @@ export async function joinRoom(
 
   if (roomError || !room) throw new Error('Room tidak ditemukan.')
 
-  // 3. Generate new device token for this device
-  const deviceToken = generateDeviceToken()
-  saveDeviceToken(deviceToken)
-
-  // 4. Insert contributor member
+  // 3. Insert contributor member
   const { data: member, error: memberError } = await supabase
     .from('members')
     .insert({
@@ -174,17 +224,15 @@ export async function revokeInviteToken(tokenId: string): Promise<void> {
   if (error) throw new Error('Gagal merevoke token')
 }
 
-// ─── Get all members in a room ─────────────────────────────────
+// ─── Get all members in a room (safe profile fields only) ─────
 export async function getRoomMembers(roomId: string): Promise<Member[]> {
   const { data, error } = await supabase
     .from('members')
-    .select('*')
     .select('id, room_id, name, avatar_url, role, joined_at')
     .eq('room_id', roomId)
     .order('joined_at', { ascending: true })
 
   if (error) throw new Error(error.message)
-  return data ?? []
   return (data as unknown as Member[]) ?? []
 }
 
@@ -200,4 +248,3 @@ export async function getActiveInviteTokens(roomId: string) {
   if (error) throw new Error(error.message)
   return data ?? []
 }
-

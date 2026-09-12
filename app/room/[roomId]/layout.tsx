@@ -39,15 +39,10 @@ export default function RoomLayout({ children }: { children: React.ReactNode }) 
       {/* Top navbar */}
       <RoomNavbar />
 
-      {/* Main content area with bottom padding for BottomNav */}
-      <main className="flex-1 pb-20 lg:pb-0 lg:pl-64">
+      {/* Main content area */}
+      <main className="flex-1 pb-24 lg:pb-12">
         {children}
       </main>
-
-      {/* Desktop sidebar (hidden on mobile) */}
-      <aside className="hidden lg:block fixed left-0 top-0 h-full w-64 z-30" aria-label="Sidebar navigasi">
-        {/* Sidebar rendered inside RoomNavbar on desktop for simplicity */}
-      </aside>
 
       {/* Mobile bottom nav (hidden on desktop) */}
       <BottomNav roomId={params.roomId} />
