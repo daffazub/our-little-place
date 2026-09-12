@@ -265,3 +265,4 @@ CREATE TABLE IF NOT EXISTS quote_likes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (quote_id, member_id)
 );
+
