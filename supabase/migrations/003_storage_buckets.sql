@@ -32,9 +32,11 @@ CREATE POLICY "photos_insert_member" ON storage.objects
     bucket_id = 'photos'
     AND auth.role() = 'anon'
     -- path format: {room_id}/{memory_id}/{filename}
+    -- validate room membership via device_token header
     -- validate room membership via device_token header safely
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
@@ -45,6 +47,7 @@ CREATE POLICY "photos_delete_member" ON storage.objects
     bucket_id = 'photos'
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
@@ -61,6 +64,7 @@ CREATE POLICY "videos_insert_member" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
@@ -71,6 +75,7 @@ CREATE POLICY "videos_delete_member" ON storage.objects
     bucket_id = 'videos'
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
@@ -84,6 +89,7 @@ CREATE POLICY "music_select_member" ON storage.objects
     bucket_id = 'music'
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
@@ -94,6 +100,7 @@ CREATE POLICY "music_insert_member" ON storage.objects
     bucket_id = 'music'
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
@@ -104,7 +111,9 @@ CREATE POLICY "music_delete_member" ON storage.objects
     bucket_id = 'music'
     AND EXISTS (
       SELECT 1 FROM members
+      WHERE room_id = (storage.foldername(name))[1]::UUID
       WHERE room_id = safe_cast_uuid((storage.foldername(name))[1])
         AND device_token = current_setting('request.headers', true)::json->>'x-device-token'
     )
   );
+

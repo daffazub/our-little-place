@@ -31,6 +31,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Attach device_token header to all Supabase requests
   const attachDeviceToken = useCallback((token: string) => {
+    supabase.realtime.setAuth(token)
+    // Override global headers for RLS
+    // @ts-expect-error — internal API
+    supabase['rest']['headers']['x-device-token'] = token
+    // @ts-expect-error
+    supabase['storage']['headers']['x-device-token'] = token
     try {
       supabase.realtime.setAuth(token)
     } catch {

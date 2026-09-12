@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 
+// Root page — redirect based on session
 // Root page — redirect based on active session
 export default async function RootPage() {
   const cookieStore = await cookies()
@@ -11,6 +12,9 @@ export default async function RootPage() {
     redirect('/create')
   }
 
+  // If device token exists, we need to find which room they belong to
+  // The actual room lookup happens client-side from localStorage
+  redirect('/room/loading')
   let targetRoomId: string | null = null
 
   try {

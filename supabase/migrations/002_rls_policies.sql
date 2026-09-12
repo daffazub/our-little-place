@@ -88,6 +88,9 @@ CREATE POLICY "members_select_room" ON members
     is_room_member(room_id, current_setting('request.headers', true)::json->>'x-device-token')
   );
 
+-- Allow insert (joining a room / creating a room)
+CREATE POLICY "members_insert_all" ON members
+  FOR INSERT WITH CHECK (true);
 -- Allow insert: owner only if room is brand new; contributor only if active invite token exists
 CREATE POLICY "members_insert_first_owner" ON members
   FOR INSERT WITH CHECK (
@@ -387,6 +390,10 @@ CREATE POLICY "comments_delete" ON comments FOR DELETE USING (
   )
 );
 
+-- ============================================================
+-- INVITE TOKENS
+-- ============================================================
+CREATE POLICY "invite_tokens_select" ON invite_tokens FOR SELECT USING (true);  -- Public read for validation
 -- Only room members can list invite tokens, or anon can query active (non-revoked) tokens
 CREATE POLICY "invite_tokens_select" ON invite_tokens FOR SELECT USING (
   is_room_member(room_id, current_setting('request.headers', true)::json->>'x-device-token')

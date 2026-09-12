@@ -18,6 +18,7 @@ function generateDeviceToken(): string {
 // (cookie is read by the server client for RLS)
 function saveDeviceToken(token: string) {
   localStorage.setItem(DEVICE_TOKEN_KEY, token)
+  document.cookie = `olp_device_token=${token}; path=/; SameSite=Lax; max-age=31536000`
   const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
   const secureFlag = isSecure ? '; Secure' : ''
   document.cookie = `olp_device_token=${token}; path=/; SameSite=Lax; max-age=31536000${secureFlag}`
@@ -47,6 +48,7 @@ export function loadSession(): SessionMember | null {
 export function clearSession() {
   localStorage.removeItem(DEVICE_TOKEN_KEY)
   localStorage.removeItem(SESSION_KEY)
+  document.cookie = 'olp_device_token=; path=/; max-age=0'
   const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
   const secureFlag = isSecure ? '; Secure' : ''
   document.cookie = `olp_device_token=; path=/; max-age=0; SameSite=Lax${secureFlag}`
@@ -176,11 +178,13 @@ export async function revokeInviteToken(tokenId: string): Promise<void> {
 export async function getRoomMembers(roomId: string): Promise<Member[]> {
   const { data, error } = await supabase
     .from('members')
+    .select('*')
     .select('id, room_id, name, avatar_url, role, joined_at')
     .eq('room_id', roomId)
     .order('joined_at', { ascending: true })
 
   if (error) throw new Error(error.message)
+  return data ?? []
   return (data as unknown as Member[]) ?? []
 }
 
