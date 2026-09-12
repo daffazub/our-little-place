@@ -64,7 +64,7 @@ export default function RoomNavbar() {
             setTimeout(() => setCopied(false), 2500)
             return
           } catch {
-            // If user closed share dialog, fallback to copy
+            // User aborted native share sheet; fallback to clipboard
           }
         }
         if (navigator.clipboard?.writeText) {
@@ -173,4 +173,3 @@ export default function RoomNavbar() {
     </header>
   )
 }
-

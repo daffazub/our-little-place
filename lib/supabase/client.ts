@@ -48,3 +48,4 @@ export function setSupabaseDeviceToken(token: string) {
 
 // Convenience shorthand used in client components
 export const supabase = getSupabaseBrowserClient()
+
