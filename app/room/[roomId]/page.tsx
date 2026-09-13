@@ -8,7 +8,7 @@ import {
   Image as ImageIcon,
   BookOpen,
   Calendar,
-  Quote,
+  Gift,
   Heart,
   Plus,
   ArrowRight,
@@ -183,14 +183,14 @@ export default function RoomDashboardPage() {
         </Link>
 
         <Link
-          href={`/room/${params.roomId}/quotes`}
+          href={`/room/${params.roomId}/calendar`}
           className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--accent-border)] hover:bg-[var(--accent-tint)] transition-all group shadow-sm flex flex-col items-center text-center gap-2"
         >
-          <div className="w-10 h-10 rounded-xl bg-[var(--favorite-tint)] text-[var(--favorite)] group-hover:scale-110 transition-transform flex items-center justify-center">
-            <Quote className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-[var(--accent-tint)] text-[var(--accent-text)] group-hover:scale-110 transition-transform flex items-center justify-center">
+            <Gift className="w-5 h-5" />
           </div>
-          <span className="text-xs font-bold text-[var(--text-primary)]">Quotes</span>
-          <span className="text-[11px] text-[var(--text-muted)]">Canda & kata mutiara</span>
+          <span className="text-xs font-bold text-[var(--text-primary)]">Kalender</span>
+          <span className="text-[11px] text-[var(--text-muted)]">Ulang tahun & momen</span>
         </Link>
       </section>
 

@@ -11,8 +11,7 @@ import {
   Image as ImageIcon,
   Calendar,
   BookOpen,
-  Quote,
-  Heart,
+  Gift,
   Settings,
   Home,
 } from 'lucide-react'
@@ -35,8 +34,7 @@ export default function RoomNavbar() {
     { label: 'Kenangan', href: `/room/${roomId}/memories`, icon: ImageIcon },
     { label: 'Cerita', href: `/room/${roomId}/stories`, icon: BookOpen },
     { label: 'Rencana', href: `/room/${roomId}/plans`, icon: Calendar },
-    { label: 'Quotes', href: `/room/${roomId}/quotes`, icon: Quote },
-    { label: 'Hal Kecil', href: `/room/${roomId}/little-things`, icon: Heart },
+    { label: 'Kalender', href: `/room/${roomId}/calendar`, icon: Gift },
     { label: 'Pengaturan', href: `/room/${roomId}/settings`, icon: Settings },
   ]
 
