@@ -2,9 +2,16 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { BookOpen, Plus, Calendar, User, X, Loader2 } from 'lucide-react'
+import { BookOpen, Plus, Calendar, X, Loader2 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import type { Story } from '@/types/database'
 
 export default function StoriesPage() {
@@ -26,15 +33,21 @@ export default function StoriesPage() {
     if (!params.roomId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('room_id', params.roomId)
-        .order('date', { ascending: false })
+      const roomId = params.roomId
+      const storiesRef = collection(db, 'rooms', roomId, 'stories')
+      let list: Story[] = []
 
-      if (!error && data) {
-        setStories(data as Story[])
+      try {
+        const q = query(storiesRef, orderBy('date', 'desc'))
+        const snap = await getDocs(q)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Story))
+      } catch {
+        const snap = await getDocs(storiesRef)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Story))
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
       }
+
+      setStories(list)
     } catch (err) {
       console.error('Failed to load stories:', err)
     } finally {
@@ -52,21 +65,20 @@ export default function StoriesPage() {
       setError('Judul dan isi cerita tidak boleh kosong.')
       return
     }
-    if (!session) return
+    if (!session || !params.roomId) return
 
     setSubmitting(true)
     setError('')
 
     try {
-      const { error: insertError } = await supabase.from('stories').insert({
+      await addDoc(collection(db, 'rooms', params.roomId, 'stories'), {
         room_id: params.roomId,
         title: title.trim(),
         content: content.trim(),
         date,
         created_by: session.id,
+        created_at: new Date().toISOString(),
       })
-
-      if (insertError) throw new Error(insertError.message)
 
       setTitle('')
       setContent('')
@@ -102,11 +114,11 @@ export default function StoriesPage() {
         </button>
       </div>
 
-      {/* Stories Feed */}
+      {/* Stories List */}
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-40 skeleton rounded-3xl" />
+            <div key={i} className="h-32 skeleton rounded-3xl" />
           ))}
         </div>
       ) : stories.length === 0 ? (
@@ -114,40 +126,36 @@ export default function StoriesPage() {
           <BookOpen className="w-12 h-12 text-[var(--text-muted)] mx-auto" />
           <h3 className="text-sm font-bold text-[var(--text-primary)]">Belum ada cerita yang ditulis</h3>
           <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-            Mulailah menulis kisah pertama tentang persahabatan kalian di sini.
+            Setiap momen punya kisahnya sendiri. Mulai tuangkan perasaan atau kisah seru kalian di sini.
           </p>
           <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all"
           >
-            <Plus className="w-4 h-4" /> Mulai Menulis
+            <Plus className="w-4 h-4" /> Tulis Cerita Pertama
           </button>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {stories.map(story => (
             <article
               key={story.id}
-              className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm hover:shadow-md transition-shadow space-y-4"
+              className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm hover:shadow-md transition-shadow space-y-3"
             >
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-3">
-                <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                <span className="flex items-center gap-1.5 font-medium">
                   <Calendar className="w-3.5 h-3.5" />
                   {story.date}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[var(--warm-tint)] text-[var(--warm-text)] text-[10px] font-bold">
-                  Kisah Kita
-                </span>
               </div>
 
-              <div>
-                <h2 className="text-lg font-bold text-[var(--text-primary)] leading-tight">
-                  {story.title}
-                </h2>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-2.5 whitespace-pre-line leading-relaxed font-serif">
-                  {story.content}
-                </p>
-              </div>
+              <h2 className="text-lg font-bold text-[var(--text-primary)] leading-snug">
+                {story.title}
+              </h2>
+
+              <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">
+                {story.content}
+              </p>
             </article>
           ))}
         </div>
@@ -159,7 +167,7 @@ export default function StoriesPage() {
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[var(--accent-text)]" />
+                <Plus className="w-5 h-5 text-[var(--warm)]" />
                 Tulis Cerita Baru
               </h2>
               <button
@@ -185,7 +193,7 @@ export default function StoriesPage() {
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  placeholder="Contoh: Malam Tak Terlupakan di Puncak"
+                  placeholder="Contoh: Hari Pertama Berkemah di Hutan..."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
                 />
               </div>
@@ -209,9 +217,9 @@ export default function StoriesPage() {
                 <textarea
                   value={content}
                   onChange={e => setContent(e.target.value)}
-                  rows={8}
-                  placeholder="Tuangkan semua cerita, detail lucu, atau pesan menyentuh hati di sini..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)] resize-none leading-relaxed"
+                  rows={6}
+                  placeholder="Tuliskan kisah, perasaan, atau kejadian berharga yang kalian lalui bersama..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)] resize-none"
                 />
               </div>
 
@@ -234,7 +242,7 @@ export default function StoriesPage() {
                       Menyimpan...
                     </>
                   ) : (
-                    'Publikasikan Cerita'
+                    'Simpan Cerita'
                   )}
                 </button>
               </div>

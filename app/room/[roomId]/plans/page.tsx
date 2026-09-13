@@ -4,7 +4,16 @@ import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Calendar, Plus, MapPin, Clock, CheckCircle2, Circle, X, Loader2 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  addDoc,
+  doc,
+  getDocs,
+  updateDoc,
+  query,
+  orderBy,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import type { Plan, PlanStatus } from '@/types/database'
 
 export default function PlansPage() {
@@ -29,15 +38,21 @@ export default function PlansPage() {
     if (!params.roomId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('room_id', params.roomId)
-        .order('date', { ascending: true })
+      const roomId = params.roomId
+      const plansRef = collection(db, 'rooms', roomId, 'plans')
+      let list: Plan[] = []
 
-      if (!error && data) {
-        setPlans(data as Plan[])
+      try {
+        const q = query(plansRef, orderBy('date', 'asc'))
+        const snap = await getDocs(q)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Plan))
+      } catch {
+        const snap = await getDocs(plansRef)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Plan))
+        list.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
       }
+
+      setPlans(list)
     } catch (err) {
       console.error('Failed to load plans:', err)
     } finally {
@@ -50,16 +65,19 @@ export default function PlansPage() {
   }, [params.roomId])
 
   const handleToggleStatus = async (plan: Plan) => {
+    if (!params.roomId) return
     const nextStatus: PlanStatus = plan.status === 'completed' ? 'upcoming' : 'completed'
     try {
-      await supabase
-        .from('plans')
-        .update({ status: nextStatus })
-        .eq('id', plan.id)
+      const planRef = doc(db, 'rooms', params.roomId, 'plans', plan.id)
+      await updateDoc(planRef, { status: nextStatus })
 
-      loadPlans()
+      // Optimistic update
+      setPlans(prev =>
+        prev.map(p => (p.id === plan.id ? { ...p, status: nextStatus } : p))
+      )
     } catch (err) {
       console.error('Failed to update plan status:', err)
+      loadPlans()
     }
   }
 
@@ -69,13 +87,13 @@ export default function PlansPage() {
       setError('Nama agenda rencana wajib diisi.')
       return
     }
-    if (!session) return
+    if (!session || !params.roomId) return
 
     setSubmitting(true)
     setError('')
 
     try {
-      const { error: insertError } = await supabase.from('plans').insert({
+      await addDoc(collection(db, 'rooms', params.roomId, 'plans'), {
         room_id: params.roomId,
         title: title.trim(),
         description: description.trim() || null,
@@ -84,9 +102,8 @@ export default function PlansPage() {
         location: location.trim() || null,
         status: 'upcoming',
         created_by: session.id,
+        created_at: new Date().toISOString(),
       })
-
-      if (insertError) throw new Error(insertError.message)
 
       setTitle('')
       setDescription('')
@@ -198,34 +215,35 @@ export default function PlansPage() {
                 {/* Complete toggle button */}
                 <button
                   onClick={() => handleToggleStatus(plan)}
-                  className="mt-0.5 shrink-0 text-[var(--text-muted)] hover:text-[var(--success)] transition-colors"
+                  className={`mt-0.5 transition-colors ${
+                    isDone
+                      ? 'text-[var(--success)]'
+                      : 'text-[var(--text-muted)] hover:text-[var(--success)]'
+                  }`}
                 >
                   {isDone ? (
-                    <CheckCircle2 className="w-5 h-5 text-[var(--success)]" />
+                    <CheckCircle2 className="w-5 h-5 fill-[var(--success-tint)]" />
                   ) : (
                     <Circle className="w-5 h-5" />
                   )}
                 </button>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className={`text-sm font-bold truncate ${isDone ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
-                      {plan.title}
-                    </h3>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold shrink-0 ${
-                      isDone ? 'bg-[var(--success-tint)] text-[var(--success-text)]' : 'bg-[var(--accent-tint)] text-[var(--accent-text)]'
-                    }`}>
-                      {isDone ? 'Selesai' : 'Rencana'}
-                    </span>
-                  </div>
-
+                {/* Plan Content */}
+                <div className="flex-1 min-w-0 space-y-1">
+                  <h3
+                    className={`text-sm font-bold text-[var(--text-primary)] leading-tight ${
+                      isDone ? 'line-through text-[var(--text-muted)]' : ''
+                    }`}
+                  >
+                    {plan.title}
+                  </h3>
                   {plan.description && (
-                    <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
+                    <p className="text-xs text-[var(--text-secondary)] line-clamp-2">
                       {plan.description}
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-[var(--text-muted)] mt-2">
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-[var(--text-muted)]">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
                       {plan.date}
@@ -253,11 +271,11 @@ export default function PlansPage() {
       {/* Modal Buat Rencana */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[var(--accent-text)]" />
-                Tambah Rencana Baru
+                <Plus className="w-5 h-5 text-[var(--success)]" />
+                Buat Rencana Baru
               </h2>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -282,15 +300,28 @@ export default function PlansPage() {
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  placeholder="Contoh: Barbeque Akhir Tahun, Nonton Konser"
+                  placeholder="Contoh: Barbeque Malam Tahun Baru"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
+                  Deskripsi Singkat
+                </label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Detail rencana, apa yang perlu dibawa, dll..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)] resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                    Tanggal
+                    Tanggal *
                   </label>
                   <input
                     type="date"
@@ -302,7 +333,7 @@ export default function PlansPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                    Waktu (Opsional)
+                    Waktu / Jam
                   </label>
                   <input
                     type="time"
@@ -315,27 +346,14 @@ export default function PlansPage() {
 
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                  Lokasi Pertemuan
+                  Lokasi / Tempat
                 </label>
                 <input
                   type="text"
                   value={location}
                   onChange={e => setLocation(e.target.value)}
-                  placeholder="Contoh: Rumah Daffa, Mall Grand Indonesia..."
+                  placeholder="Contoh: Rooftop Rumah Daffa / Puncak"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                  Detail Catatan
-                </label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Rincian dresscode, barang yang perlu dibawa, dll..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)] resize-none"
                 />
               </div>
 

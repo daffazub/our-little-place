@@ -2,9 +2,20 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Quote as QuoteIcon, Plus, Heart, Calendar, User, X, Loader2 } from 'lucide-react'
+import { Quote as QuoteIcon, Plus, Heart, X, Loader2 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  addDoc,
+  doc,
+  getDocs,
+  updateDoc,
+  query,
+  orderBy,
+  arrayUnion,
+  arrayRemove,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import type { Quote } from '@/types/database'
 
 export default function QuotesPage() {
@@ -26,15 +37,21 @@ export default function QuotesPage() {
     if (!params.roomId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('quotes')
-        .select('*, quote_likes(*)')
-        .eq('room_id', params.roomId)
-        .order('created_at', { ascending: false })
+      const roomId = params.roomId
+      const quotesRef = collection(db, 'rooms', roomId, 'quotes')
+      let list: Quote[] = []
 
-      if (!error && data) {
-        setQuotes(data as Quote[])
+      try {
+        const q = query(quotesRef, orderBy('created_at', 'desc'))
+        const snap = await getDocs(q)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Quote))
+      } catch {
+        const snap = await getDocs(quotesRef)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Quote))
+        list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       }
+
+      setQuotes(list)
     } catch (err) {
       console.error('Failed to load quotes:', err)
     } finally {
@@ -47,26 +64,37 @@ export default function QuotesPage() {
   }, [params.roomId])
 
   const handleToggleLike = async (quoteId: string) => {
-    if (!session) return
+    if (!session || !params.roomId) return
     try {
-      const current = quotes.find(q => q.id === quoteId)
-      const liked = (current as any)?.quote_likes?.some((l: any) => l.member_id === session.id)
+      const quote = quotes.find(q => q.id === quoteId)
+      if (!quote) return
 
-      if (liked) {
-        await supabase
-          .from('quote_likes')
-          .delete()
-          .eq('quote_id', quoteId)
-          .eq('member_id', session.id)
+      const likes = quote.likes || []
+      const isLiked = likes.includes(session.id)
+      const quoteRef = doc(db, 'rooms', params.roomId, 'quotes', quoteId)
+
+      if (isLiked) {
+        await updateDoc(quoteRef, { likes: arrayRemove(session.id) })
       } else {
-        await supabase.from('quote_likes').insert({
-          quote_id: quoteId,
-          member_id: session.id,
-        })
+        await updateDoc(quoteRef, { likes: arrayUnion(session.id) })
       }
-      loadQuotes()
+
+      // Optimistic update
+      setQuotes(prev =>
+        prev.map(q => {
+          if (q.id !== quoteId) return q
+          const currentLikes = q.likes || []
+          return {
+            ...q,
+            likes: isLiked
+              ? currentLikes.filter(id => id !== session.id)
+              : [...currentLikes, session.id],
+          }
+        })
+      )
     } catch (err) {
       console.error('Failed to toggle like on quote:', err)
+      loadQuotes()
     }
   }
 
@@ -76,21 +104,21 @@ export default function QuotesPage() {
       setError('Kutipan dan nama pengucap wajib diisi.')
       return
     }
-    if (!session) return
+    if (!session || !params.roomId) return
 
     setSubmitting(true)
     setError('')
 
     try {
-      const { error: insertError } = await supabase.from('quotes').insert({
+      await addDoc(collection(db, 'rooms', params.roomId, 'quotes'), {
         room_id: params.roomId,
         text: text.trim(),
         said_by: saidBy.trim(),
         context: context.trim() || null,
+        likes: [],
         created_by: session.id,
+        created_at: new Date().toISOString(),
       })
-
-      if (insertError) throw new Error(insertError.message)
 
       setText('')
       setSaidBy('')
@@ -151,8 +179,8 @@ export default function QuotesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {quotes.map(quote => {
-            const likes = (quote as any).quote_likes || []
-            const isLiked = likes.some((l: any) => l.member_id === session?.id)
+            const likes = quote.likes || []
+            const isLiked = session ? likes.includes(session.id) : false
 
             return (
               <div

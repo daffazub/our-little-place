@@ -16,9 +16,17 @@ import {
   Clock,
 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import { getMediaUrl } from '@/lib/storage'
-import type { Memory, Story, Plan, Member } from '@/types/database'
+import type { Memory, Story, Plan } from '@/types/database'
 
 export default function RoomDashboardPage() {
   const params = useParams<{ roomId: string }>()
@@ -36,37 +44,64 @@ export default function RoomDashboardPage() {
       setLoading(true)
 
       try {
-        // Fetch counts & recent items in parallel
-        const [membersRes, memoriesRes, plansRes, storiesRes] = await Promise.all([
-          supabase
-            .from('members')
-            .select('id', { count: 'exact', head: true })
-            .eq('room_id', params.roomId),
-          supabase
-            .from('memories')
-            .select('*, memory_photos(*)')
-            .eq('room_id', params.roomId)
-            .order('date', { ascending: false })
-            .limit(4),
-          supabase
-            .from('plans')
-            .select('*')
-            .eq('room_id', params.roomId)
-            .eq('status', 'upcoming')
-            .order('date', { ascending: true })
-            .limit(3),
-          supabase
-            .from('stories')
-            .select('*')
-            .eq('room_id', params.roomId)
-            .order('created_at', { ascending: false })
-            .limit(2),
-        ])
+        const roomId = params.roomId
 
-        if (membersRes.count !== null) setMembersCount(membersRes.count)
-        if (memoriesRes.data) setRecentMemories(memoriesRes.data as Memory[])
-        if (plansRes.data) setUpcomingPlans(plansRes.data as Plan[])
-        if (storiesRes.data) setRecentStories(storiesRes.data as Story[])
+        // 1. Members count
+        const membersRef = collection(db, 'rooms', roomId, 'members')
+        const membersSnap = await getDocs(membersRef)
+        setMembersCount(membersSnap.size || 1)
+
+        // 2. Recent Memories
+        try {
+          const memQuery = query(
+            collection(db, 'rooms', roomId, 'memories'),
+            orderBy('date', 'desc'),
+            limit(4)
+          )
+          const memSnap = await getDocs(memQuery)
+          setRecentMemories(memSnap.docs.map(d => ({ id: d.id, ...d.data() } as Memory)))
+        } catch {
+          // Fallback if no index
+          const memSnap = await getDocs(collection(db, 'rooms', roomId, 'memories'))
+          const list = memSnap.docs.map(d => ({ id: d.id, ...d.data() } as Memory))
+          list.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+          setRecentMemories(list.slice(0, 4))
+        }
+
+        // 3. Upcoming Plans
+        try {
+          const plansQuery = query(
+            collection(db, 'rooms', roomId, 'plans'),
+            where('status', '==', 'upcoming'),
+            orderBy('date', 'asc'),
+            limit(3)
+          )
+          const plansSnap = await getDocs(plansQuery)
+          setUpcomingPlans(plansSnap.docs.map(d => ({ id: d.id, ...d.data() } as Plan)))
+        } catch {
+          const plansSnap = await getDocs(collection(db, 'rooms', roomId, 'plans'))
+          const list = plansSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Plan))
+            .filter(p => p.status === 'upcoming')
+          list.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+          setUpcomingPlans(list.slice(0, 3))
+        }
+
+        // 4. Recent Stories
+        try {
+          const storiesQuery = query(
+            collection(db, 'rooms', roomId, 'stories'),
+            orderBy('created_at', 'desc'),
+            limit(2)
+          )
+          const storiesSnap = await getDocs(storiesQuery)
+          setRecentStories(storiesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Story)))
+        } catch {
+          const storiesSnap = await getDocs(collection(db, 'rooms', roomId, 'stories'))
+          const list = storiesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Story))
+          list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          setRecentStories(list.slice(0, 2))
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err)
       } finally {
@@ -202,7 +237,7 @@ export default function RoomDashboardPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {recentMemories.map((memory) => {
-                  const cover = memory.memory_photos?.[0]?.storage_path
+                  const cover = memory.photos?.[0]?.url || memory.photos?.[0]?.storage_path || memory.memory_photos?.[0]?.storage_path
                   return (
                     <div
                       key={memory.id}
@@ -210,7 +245,7 @@ export default function RoomDashboardPage() {
                     >
                       {cover ? (
                         <img
-                          src={getMediaUrl(cover, 'photos')}
+                          src={getMediaUrl(cover)}
                           alt={memory.title}
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
@@ -273,7 +308,7 @@ export default function RoomDashboardPage() {
           </div>
         </div>
 
-        {/* Right 1 Col: Upcoming Plans & Little Things */}
+        {/* Right 1 Col: Upcoming Plans & Info */}
         <div className="space-y-6">
           {/* Upcoming Plans */}
           <div className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm">
@@ -345,4 +380,3 @@ export default function RoomDashboardPage() {
     </div>
   )
 }
-

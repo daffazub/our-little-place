@@ -1,4 +1,4 @@
-# Next.js App Directory Structure
+# Next.js App Directory Structure (Firebase Architecture)
 #
 # D:\Projek\our-little-place-v2\
 # ├── app/
@@ -7,64 +7,35 @@
 # │   ├── (auth)/
 # │   │   ├── create/page.tsx               Create new room
 # │   │   └── join/[roomId]/[token]/page.tsx Join via invite link
-# │   ├── room/
-# │   │   └── [roomId]/
-# │   │       ├── layout.tsx                Room shell (nav, audio dock)
-# │   │       ├── page.tsx                  Home / Dashboard
-# │   │       ├── memories/page.tsx         Memory gallery
-# │   │       ├── plans/page.tsx            Future plans
-# │   │       ├── stories/page.tsx          Long-form stories
-# │   │       ├── calendar/page.tsx         Interactive calendar
-# │   │       ├── quotes/page.tsx           Quotes & inside jokes
-# │   │       ├── little-things/page.tsx    Little things
-# │   │       └── settings/page.tsx         Room settings, members, invite
-# │   └── api/
-# │       └── keep-alive/route.ts           Supabase ping cron
+# │   └── room/
+# │       └── [roomId]/
+# │           ├── layout.tsx                Room shell (nav, audio dock)
+# │           ├── page.tsx                  Home / Dashboard
+# │           ├── memories/page.tsx         Memory gallery & photo upload
+# │           ├── plans/page.tsx            Future plans & toggles
+# │           ├── stories/page.tsx          Long-form stories & journals
+# │           ├── calendar/page.tsx         Important dates & celebrations
+# │           ├── quotes/page.tsx           Quotes & inside jokes
+# │           ├── little-things/page.tsx    Daily little things
+# │           └── settings/page.tsx         Room settings, members, invite tokens
 # ├── components/
-# │   ├── ui/                               Base UI primitives
-# │   │   ├── Button.tsx
-# │   │   ├── Input.tsx
-# │   │   ├── Modal.tsx
-# │   │   ├── Skeleton.tsx
-# │   │   └── Avatar.tsx
 # │   ├── navigation/
 # │   │   ├── Navbar.tsx
-# │   │   ├── BottomNav.tsx
-# │   │   └── Sidebar.tsx
-# │   ├── memory/
-# │   │   ├── MemoryCard.tsx
-# │   │   ├── MemoryGrid.tsx
-# │   │   ├── AddMemoryModal.tsx
-# │   │   ├── MemoryLightbox.tsx
-# │   │   ├── ReactionBar.tsx
-# │   │   └── CommentThread.tsx
-# │   ├── home/
-# │   │   ├── HeroMarquee.tsx
-# │   │   ├── OnThisDayCard.tsx
-# │   │   └── StatsBanner.tsx
+# │   │   └── BottomNav.tsx
 # │   └── audio/
 # │       └── AudioDock.tsx
 # ├── context/
 # │   ├── SessionContext.tsx
 # │   └── AudioContext.tsx
 # ├── lib/
-# │   ├── supabase/
-# │   │   ├── client.ts
-# │   │   └── server.ts
-# │   ├── auth.ts
-# │   └── storage.ts
+# │   ├── firebase/
+# │   │   └── client.ts                     Firebase SDK initialization (Firestore, Storage, Auth)
+# │   ├── auth.ts                           Device auth, room creation, invite management
+# │   └── storage.ts                        Firebase Storage upload, compression, media URL
 # ├── types/
-# │   └── database.ts
-# ├── hooks/
-# │   ├── useMemories.ts
-# │   ├── usePlans.ts
-# │   ├── useRealtime.ts
-# │   └── useSession.ts
-# ├── supabase/
-# │   └── migrations/
-# │       ├── 001_initial_schema.sql
-# │       ├── 002_rls_policies.sql
-# │       └── 003_storage_buckets.sql
+# │   └── database.ts                       TypeScript types & document interfaces
+# ├── firestore.rules                       Firestore security rules
+# ├── storage.rules                         Firebase Storage security rules
+# ├── .env.local.example                    Firebase credentials template
 # └── public/
 #     └── manifest.json
-

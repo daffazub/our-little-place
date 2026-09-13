@@ -64,7 +64,7 @@ export default function RoomNavbar() {
             setTimeout(() => setCopied(false), 2500)
             return
           } catch {
-            // User closed share dialog
+            // If user closed share dialog, fallback to clipboard copy
           }
         }
         if (navigator.clipboard?.writeText) {
@@ -74,7 +74,7 @@ export default function RoomNavbar() {
         }
       }
     } catch (err) {
-      console.error('Failed to share invite token:', err)
+      console.error('Failed to copy/share invite token:', err)
     } finally {
       setIsSharing(false)
     }
@@ -173,3 +173,4 @@ export default function RoomNavbar() {
     </header>
   )
 }
+

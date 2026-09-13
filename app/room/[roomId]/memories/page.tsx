@@ -7,18 +7,27 @@ import {
   Plus,
   Calendar,
   MapPin,
-  Smile,
   X,
   Heart,
-  MessageCircle,
   UploadCloud,
   Loader2,
   Filter,
 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  query,
+  orderBy,
+  arrayUnion,
+  arrayRemove,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import { uploadPhoto, getMediaUrl } from '@/lib/storage'
-import type { Memory, MemoryPhoto } from '@/types/database'
+import type { Memory, PhotoItem } from '@/types/database'
 
 export default function MemoriesPage() {
   const params = useParams<{ roomId: string }>()
@@ -45,15 +54,22 @@ export default function MemoriesPage() {
     if (!params.roomId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('memories')
-        .select('*, memory_photos(*), reactions(*)')
-        .eq('room_id', params.roomId)
-        .order('date', { ascending: false })
+      const roomId = params.roomId
+      const memoriesRef = collection(db, 'rooms', roomId, 'memories')
+      let list: Memory[] = []
 
-      if (!error && data) {
-        setMemories(data as Memory[])
+      try {
+        const q = query(memoriesRef, orderBy('date', 'desc'))
+        const snap = await getDocs(q)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Memory))
+      } catch {
+        // Fallback without index
+        const snap = await getDocs(memoriesRef)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Memory))
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
       }
+
+      setMemories(list)
     } catch (err) {
       console.error('Failed to load memories:', err)
     } finally {
@@ -82,44 +98,48 @@ export default function MemoriesPage() {
       setFormError('Judul kenangan wajib diisi.')
       return
     }
-    if (!session) return
+    if (!session || !params.roomId) return
 
     setUploading(true)
     setFormError('')
 
     try {
-      // 1. Insert memory record
-      const { data: memory, error: memoryError } = await supabase
-        .from('memories')
-        .insert({
-          room_id: params.roomId,
-          title: title.trim(),
-          caption: caption.trim() || null,
-          date,
-          location_name: locationName.trim() || null,
-          category,
-          created_by: session.id,
-        })
-        .select()
-        .single()
+      const roomId = params.roomId
+      const newMemoryRef = doc(collection(db, 'rooms', roomId, 'memories'))
+      const memoryId = newMemoryRef.id
 
-      if (memoryError || !memory) {
-        throw new Error(memoryError?.message || 'Gagal menyimpan kenangan.')
-      }
-
-      // 2. Upload photos if any
+      // 1. Upload photos to Firebase Storage if any
+      const photos: PhotoItem[] = []
       if (selectedFiles.length > 0) {
         for (let i = 0; i < selectedFiles.length; i++) {
           const file = selectedFiles[i]
-          const storagePath = await uploadPhoto(file, params.roomId, memory.id)
-          await supabase.from('memory_photos').insert({
-            memory_id: memory.id,
-            storage_path: storagePath,
+          const uploadRes = await uploadPhoto(file, roomId, memoryId)
+          photos.push({
+            id: `${Date.now()}-${i}`,
+            storage_path: uploadRes.storagePath,
+            url: uploadRes.downloadUrl,
             sort_order: i,
             is_cover: i === 0,
           })
         }
       }
+
+      const newMemoryData: Memory = {
+        id: memoryId,
+        room_id: roomId,
+        title: title.trim(),
+        caption: caption.trim() || null,
+        story: null,
+        date,
+        location_name: locationName.trim() || null,
+        category,
+        photos,
+        likes: [],
+        created_by: session.id,
+        created_at: new Date().toISOString(),
+      }
+
+      await setDoc(newMemoryRef, newMemoryData)
 
       // Reset form & reload
       setTitle('')
@@ -136,24 +156,41 @@ export default function MemoriesPage() {
   }
 
   const handleToggleReaction = async (memoryId: string) => {
-    if (!session) return
+    if (!session || !params.roomId) return
     try {
-      const existing = memories
-        .find(m => m.id === memoryId)
-        ?.reactions?.find(r => r.member_id === session.id && r.emoji === '❤️')
+      const memory = memories.find(m => m.id === memoryId)
+      if (!memory) return
 
-      if (existing) {
-        await supabase.from('reactions').delete().eq('id', existing.id)
+      const memberLikes = memory.likes || []
+      const hasLiked = memberLikes.includes(session.id)
+      const memoryRef = doc(db, 'rooms', params.roomId, 'memories', memoryId)
+
+      if (hasLiked) {
+        await updateDoc(memoryRef, {
+          likes: arrayRemove(session.id),
+        })
       } else {
-        await supabase.from('reactions').insert({
-          memory_id: memoryId,
-          member_id: session.id,
-          emoji: '❤️',
+        await updateDoc(memoryRef, {
+          likes: arrayUnion(session.id),
         })
       }
-      loadMemories()
+
+      // Optimistic update locally
+      setMemories(prev =>
+        prev.map(m => {
+          if (m.id !== memoryId) return m
+          const currentLikes = m.likes || []
+          return {
+            ...m,
+            likes: hasLiked
+              ? currentLikes.filter(id => id !== session.id)
+              : [...currentLikes, session.id],
+          }
+        })
+      )
     } catch (err) {
       console.error('Reaction error:', err)
+      loadMemories()
     }
   }
 
@@ -227,10 +264,11 @@ export default function MemoriesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredMemories.map(m => {
-            const photos = m.memory_photos || []
-            const cover = photos[0]?.storage_path
-            const hasLiked = m.reactions?.some(r => r.member_id === session?.id)
-            const likesCount = m.reactions?.length || 0
+            const photos = m.photos || (m.memory_photos as PhotoItem[]) || []
+            const cover = photos[0]?.url || photos[0]?.storage_path
+            const memberLikes = m.likes || []
+            const hasLiked = session ? memberLikes.includes(session.id) : false
+            const likesCount = memberLikes.length
 
             return (
               <div
@@ -241,7 +279,7 @@ export default function MemoriesPage() {
                 <div className="relative aspect-4/3 bg-[var(--surface-elevated)] overflow-hidden">
                   {cover ? (
                     <img
-                      src={getMediaUrl(cover, 'photos')}
+                      src={getMediaUrl(cover)}
                       alt={m.title}
                       className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
                     />

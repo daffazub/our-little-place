@@ -2,9 +2,16 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Calendar as CalendarIcon, Plus, Gift, Bell, X, Loader2 } from 'lucide-react'
+import { Calendar as CalendarIcon, Plus, Gift, X, Loader2 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import type { ImportantDate } from '@/types/database'
 
 export default function CalendarPage() {
@@ -26,15 +33,21 @@ export default function CalendarPage() {
     if (!params.roomId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('important_dates')
-        .select('*')
-        .eq('room_id', params.roomId)
-        .order('date', { ascending: true })
+      const roomId = params.roomId
+      const datesRef = collection(db, 'rooms', roomId, 'important_dates')
+      let list: ImportantDate[] = []
 
-      if (!error && data) {
-        setDates(data as ImportantDate[])
+      try {
+        const q = query(datesRef, orderBy('date', 'asc'))
+        const snap = await getDocs(q)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as ImportantDate))
+      } catch {
+        const snap = await getDocs(datesRef)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as ImportantDate))
+        list.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
       }
+
+      setDates(list)
     } catch (err) {
       console.error('Failed to load important dates:', err)
     } finally {
@@ -52,21 +65,20 @@ export default function CalendarPage() {
       setError('Nama momen / peringatan wajib diisi.')
       return
     }
-    if (!session) return
+    if (!session || !params.roomId) return
 
     setSubmitting(true)
     setError('')
 
     try {
-      const { error: insertError } = await supabase.from('important_dates').insert({
+      await addDoc(collection(db, 'rooms', params.roomId, 'important_dates'), {
         room_id: params.roomId,
         title: title.trim(),
         date,
         recurring,
         created_by: session.id,
+        created_at: new Date().toISOString(),
       })
-
-      if (insertError) throw new Error(insertError.message)
 
       setTitle('')
       setShowAddModal(false)

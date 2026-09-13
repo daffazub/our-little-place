@@ -1,36 +1,27 @@
-import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { getSupabaseServerClient } from '@/lib/supabase/server'
+'use client'
 
-// Root page — redirect based on active session
-export default async function RootPage() {
-  const cookieStore = await cookies()
-  const deviceToken = cookieStore.get('olp_device_token')?.value
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { loadSession } from '@/lib/auth'
 
-  if (!deviceToken) {
-    redirect('/create')
-  }
+export default function RootPage() {
+  const router = useRouter()
 
-  let targetRoomId: string | null = null
-
-  try {
-    const supabase = await getSupabaseServerClient()
-    const { data: member } = await supabase
-      .from('members')
-      .select('room_id')
-      .eq('device_token', deviceToken)
-      .maybeSingle()
-
-    if (member?.room_id) {
-      targetRoomId = member.room_id
+  useEffect(() => {
+    const session = loadSession()
+    if (session?.room_id) {
+      router.replace(`/room/${session.room_id}`)
+    } else {
+      router.replace('/create')
     }
-  } catch {
-    // Graceful fallback if database is not reachable
-  }
+  }, [router])
 
-  if (targetRoomId) {
-    redirect(`/room/${targetRoomId}`)
-  } else {
-    redirect('/create')
-  }
+  return (
+    <div className="min-h-dvh flex items-center justify-center bg-[var(--canvas)]">
+      <div className="space-y-3 text-center">
+        <div className="w-12 h-12 mx-auto skeleton rounded-2xl" />
+        <div className="w-36 h-3 mx-auto skeleton rounded-full" />
+      </div>
+    </div>
+  )
 }

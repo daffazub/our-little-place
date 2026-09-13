@@ -1,5 +1,6 @@
 // ============================================================
-// types/database.ts — TypeScript types for all Supabase tables
+// types/database.ts — TypeScript types for Our Little Place
+// Compatible with Firebase Firestore
 // ============================================================
 
 export type MemberRole = 'owner' | 'contributor'
@@ -24,6 +25,15 @@ export interface Member {
   joined_at: string
 }
 
+// ---- PHOTO OBJECT ----
+export interface PhotoItem {
+  id?: string
+  storage_path: string
+  url?: string
+  sort_order?: number
+  is_cover?: boolean
+}
+
 // ---- MEMORIES ----
 export interface Memory {
   id: string
@@ -33,47 +43,26 @@ export interface Memory {
   story: string | null
   date: string           // ISO date string YYYY-MM-DD
   location_name: string | null
-  lat: number | null
-  lng: number | null
-  mood: string | null
+  lat?: number | null
+  lng?: number | null
+  mood?: string | null
   category: string | null
   created_by: string | null
   created_at: string
-  // Joined fields (from queries with select)
-  memory_photos?: MemoryPhoto[]
-  memory_people?: { member: Member }[]
+  photos?: PhotoItem[]
+  memory_photos?: MemoryPhoto[] // alias for compatibility
+  likes?: string[]             // array of member IDs who liked
   reactions?: Reaction[]
   comments?: Comment[]
 }
 
-// ---- MEMORY PHOTOS ----
+// ---- MEMORY PHOTOS (compatibility) ----
 export interface MemoryPhoto {
   id: string
-  memory_id: string
+  memory_id?: string
   storage_path: string
-  sort_order: number
-  is_cover: boolean
-}
-
-// ---- MEMORY PEOPLE (join table) ----
-export interface MemoryPerson {
-  memory_id: string
-  member_id: string
-}
-
-// ---- ALBUMS ----
-export interface Album {
-  id: string
-  room_id: string
-  name: string
-  cover_path: string | null
-  created_at: string
-}
-
-// ---- ALBUM MEMORIES (join table) ----
-export interface AlbumMemory {
-  album_id: string
-  memory_id: string
+  sort_order?: number
+  is_cover?: boolean
 }
 
 // ---- STORIES ----
@@ -81,12 +70,11 @@ export interface Story {
   id: string
   room_id: string
   title: string
-  cover_photo_path: string | null
+  cover_photo_path?: string | null
   content: string
   date: string
   created_by: string | null
   created_at: string
-  // Joined
   author?: Member
 }
 
@@ -100,17 +88,10 @@ export interface Plan {
   time: string | null
   location: string | null
   status: PlanStatus
-  cover_photo_path: string | null
+  cover_photo_path?: string | null
   created_by: string | null
   created_at: string
-  // Joined
   participants?: Member[]
-}
-
-// ---- PLAN PARTICIPANTS (join table) ----
-export interface PlanParticipant {
-  plan_id: string
-  member_id: string
 }
 
 // ---- QUOTES ----
@@ -120,19 +101,13 @@ export interface Quote {
   text: string
   said_by: string
   context: string | null
-  date: string
-  created_by: string | null
-  created_at: string
-  // Joined
+  date?: string
+  likes?: string[] // array of member IDs
   likes_count?: number
   is_liked?: boolean
-}
-
-// ---- QUOTE LIKES ----
-export interface QuoteLike {
-  quote_id: string
-  member_id: string
+  created_by: string | null
   created_at: string
+  quote_likes?: { member_id: string }[]
 }
 
 // ---- LITTLE THINGS ----
@@ -153,27 +128,26 @@ export interface ImportantDate {
   date: string
   recurring: boolean
   created_by: string | null
+  created_at?: string
 }
 
 // ---- REACTIONS ----
 export interface Reaction {
   id: string
-  memory_id: string
+  memory_id?: string
   member_id: string
   emoji: string
   created_at: string
-  // Joined
   member?: Member
 }
 
 // ---- COMMENTS ----
 export interface Comment {
   id: string
-  memory_id: string
+  memory_id?: string
   member_id: string
   text: string
   created_at: string
-  // Joined
   member?: Member
 }
 
@@ -194,13 +168,12 @@ export interface MusicTrack {
   title: string
   artist: string | null
   storage_path: string
-  memory_id: string | null
+  memory_id?: string | null
   created_by: string | null
   created_at: string
 }
 
-// ---- SESSION (local state, not persisted to DB) ----
+// ---- SESSION (local state, persisted to localStorage / cookie) ----
 export interface SessionMember extends Member {
   room: Room
 }
-

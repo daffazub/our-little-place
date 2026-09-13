@@ -9,8 +9,9 @@ import React, {
   type ReactNode,
 } from 'react'
 import { loadSession, saveSession, clearSession } from '@/lib/auth'
-import { supabase } from '@/lib/supabase/client'
-import type { SessionMember } from '@/types/database'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
+import type { SessionMember, Room, Member } from '@/types/database'
 
 // ─── Context types ────────────────────────────────────────────
 interface SessionContextValue {
@@ -29,67 +30,62 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<SessionMember | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Attach device_token header to all Supabase requests
-  const attachDeviceToken = useCallback((token: string) => {
-    try {
-      supabase.realtime.setAuth(token)
-    } catch {
-      // Realtime auth is optional or may fail if disconnected
-    }
-    try {
-      const clientAny = supabase as unknown as {
-        rest?: { headers?: Record<string, string> }
-        storage?: { headers?: Record<string, string> }
-      }
-      if (clientAny.rest?.headers) {
-        clientAny.rest.headers['x-device-token'] = token
-      }
-      if (clientAny.storage?.headers) {
-        clientAny.storage.headers['x-device-token'] = token
-      }
-    } catch {
-      // Safe fallback if internal structure changes
+  const setSession = useCallback((s: SessionMember | null) => {
+    setSessionState(s)
+    if (s) {
+      saveSession(s)
+    } else {
+      clearSession()
     }
   }, [])
 
-  const setSession = useCallback(
-    (s: SessionMember | null) => {
-      setSessionState(s)
-      if (s) {
-        saveSession(s)
-        attachDeviceToken(s.device_token)
-      } else {
-        clearSession()
-      }
-    },
-    [attachDeviceToken]
-  )
-
   const refreshSession = useCallback(async () => {
     const current = loadSession()
-    if (!current) { setIsLoading(false); return }
-
-    // Verify member still exists in DB
-    const { data } = await supabase
-      .from('members')
-      .select('*, room:rooms(*)')
-      .eq('id', current.id)
-      .eq('device_token', current.device_token)
-      .single()
-
-    if (data) {
-      const refreshed: SessionMember = {
-        ...(data as Omit<SessionMember, 'room'>),
-        room: (data as any).room,
-      }
-      setSessionState(refreshed)
-      attachDeviceToken(refreshed.device_token)
-    } else {
-      clearSession()
-      setSessionState(null)
+    if (!current) {
+      setIsLoading(false)
+      return
     }
-    setIsLoading(false)
-  }, [attachDeviceToken])
+
+    try {
+      // Verify member and room still exist in Firestore
+      const memberDocRef = doc(db, 'rooms', current.room_id, 'members', current.id)
+      const roomDocRef = doc(db, 'rooms', current.room_id)
+
+      const [memberSnap, roomSnap] = await Promise.all([
+        getDoc(memberDocRef),
+        getDoc(roomDocRef),
+      ])
+
+      if (memberSnap.exists() && roomSnap.exists()) {
+        const memberData = memberSnap.data() as Member
+        const roomData = { id: roomSnap.id, ...roomSnap.data() } as Room
+
+        // Check if device token matches
+        if (memberData.device_token === current.device_token) {
+          const refreshed: SessionMember = {
+            ...memberData,
+            id: memberSnap.id,
+            room: roomData,
+          }
+          setSessionState(refreshed)
+          saveSession(refreshed)
+        } else {
+          clearSession()
+          setSessionState(null)
+        }
+      } else {
+        // Stale session
+        clearSession()
+        setSessionState(null)
+      }
+    } catch (err) {
+      // In case network/offline or offline cache
+      console.warn('Session refresh warning:', err)
+      setSessionState(current)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     refreshSession()
@@ -128,4 +124,3 @@ export function useRoom() {
 export function useIsOwner() {
   return useSession().isOwner
 }
-

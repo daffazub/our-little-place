@@ -13,11 +13,11 @@ import {
   LogOut,
   ShieldCheck,
   AlertCircle,
-  Loader2,
   RefreshCw,
 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import {
   getRoomMembers,
   getActiveInviteTokens,
@@ -65,17 +65,13 @@ export default function SettingsPage() {
 
   const handleUpdateRoomName = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!roomName.trim() || !isOwner) return
+    if (!roomName.trim() || !isOwner || !params.roomId) return
     setActionLoading(true)
     setNotice(null)
 
     try {
-      const { error } = await supabase
-        .from('rooms')
-        .update({ name: roomName.trim() })
-        .eq('id', params.roomId)
-
-      if (error) throw new Error(error.message)
+      const roomRef = doc(db, 'rooms', params.roomId)
+      await updateDoc(roomRef, { name: roomName.trim() })
 
       await refreshSession()
       setNotice({ text: 'Nama tempat kenangan berhasil diperbarui!' })
@@ -90,7 +86,7 @@ export default function SettingsPage() {
   }
 
   const handleCreateNewToken = async () => {
-    if (!session || !isOwner) return
+    if (!session || !isOwner || !params.roomId) return
     setActionLoading(true)
     try {
       await generateInviteToken(params.roomId, session.id)
@@ -104,9 +100,9 @@ export default function SettingsPage() {
   }
 
   const handleRevokeToken = async (tokenId: string) => {
-    if (!isOwner) return
+    if (!isOwner || !params.roomId) return
     try {
-      await revokeInviteToken(tokenId)
+      await revokeInviteToken(params.roomId, tokenId)
       await loadData()
       setNotice({ text: 'Link undangan berhasil dinonaktifkan.' })
     } catch (err) {

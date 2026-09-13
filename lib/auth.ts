@@ -1,28 +1,48 @@
 'use client'
 
-import { supabase, setSupabaseDeviceToken } from './supabase/client'
-import type { Member, Room, SessionMember } from '@/types/database'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+} from 'firebase/firestore'
+import { db, ensureAnonymousUser } from './firebase/client'
+import type { Member, Room, SessionMember, InviteToken } from '@/types/database'
 
 // ─── Keys for localStorage / cookie ───────────────────────────
 const DEVICE_TOKEN_KEY = 'olp_device_token'
 const SESSION_KEY      = 'olp_session'
 
 // ─── Generate a cryptographically random device token ─────────
-function generateDeviceToken(): string {
+export function generateDeviceToken(): string {
   const array = new Uint8Array(32)
   crypto.getRandomValues(array)
   return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// ─── Persist device_token in localStorage, cookie, and client headers
-function saveDeviceToken(token: string) {
+export function generateRandomToken(len = 16): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let res = ''
+  for (let i = 0; i < len; i++) {
+    res += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return res
+}
+
+// ─── Persist device_token in localStorage and cookie ──────────
+export function saveDeviceToken(token: string) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(DEVICE_TOKEN_KEY, token)
     const isSecure = window.location.protocol === 'https:'
     const secureFlag = isSecure ? '; Secure' : ''
     document.cookie = `olp_device_token=${token}; path=/; SameSite=Lax; max-age=31536000${secureFlag}`
   }
-  setSupabaseDeviceToken(token)
 }
 
 export function getDeviceToken(): string | null {
@@ -34,8 +54,8 @@ export function getDeviceToken(): string | null {
 export function saveSession(session: SessionMember) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    saveDeviceToken(session.device_token)
   }
-  setSupabaseDeviceToken(session.device_token)
 }
 
 export function loadSession(): SessionMember | null {
@@ -57,7 +77,6 @@ export function clearSession() {
     const secureFlag = isSecure ? '; Secure' : ''
     document.cookie = `olp_device_token=; path=/; max-age=0; SameSite=Lax${secureFlag}`
   }
-  setSupabaseDeviceToken('')
 }
 
 // ─── Create new room + owner member ───────────────────────────
@@ -66,64 +85,92 @@ export async function createRoom(
   ownerName: string,
   avatarUrl?: string
 ): Promise<SessionMember> {
+  await ensureAnonymousUser()
   const deviceToken = generateDeviceToken()
   saveDeviceToken(deviceToken)
 
-  // Try RPC first for atomic transaction if available
-  try {
-    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('create_room_with_owner', {
-      p_room_name: roomName,
-      p_owner_name: ownerName,
-      p_avatar_url: avatarUrl ?? null,
-      p_device_token: deviceToken,
-    })
+  const now = new Date().toISOString()
 
-    if (!rpcError && rpcData?.room && rpcData?.member) {
-      const session: SessionMember = {
-        ...rpcData.member,
-        room: rpcData.room,
-      }
-      saveSession(session)
-      return session
-    }
-  } catch {
-    // Fall back to direct queries below
+  // 1. Create Room document
+  const roomRef = doc(collection(db, 'rooms'))
+  const roomId = roomRef.id
+
+  // 2. Create Owner Member document in subcollection
+  const memberRef = doc(collection(db, 'rooms', roomId, 'members'))
+  const memberId = memberRef.id
+
+  const memberData: Member = {
+    id: memberId,
+    room_id: roomId,
+    name: ownerName,
+    avatar_url: avatarUrl ?? null,
+    role: 'owner',
+    device_token: deviceToken,
+    joined_at: now,
   }
 
-  // Direct queries fallback
-  // 1. Insert room (owner_id set after we have member id)
-  const { data: room, error: roomError } = await supabase
-    .from('rooms')
-    .insert({ name: roomName })
-    .select()
-    .single()
+  const roomData: Room = {
+    id: roomId,
+    name: roomName,
+    owner_id: memberId,
+    created_at: now,
+  }
 
-  if (roomError || !room) throw new Error(roomError?.message ?? 'Failed to create room')
+  // Save room & member
+  await setDoc(roomRef, roomData)
+  await setDoc(memberRef, memberData)
 
-  // 2. Insert owner member
-  const { data: member, error: memberError } = await supabase
-    .from('members')
-    .insert({
-      room_id: room.id,
-      name: ownerName,
-      avatar_url: avatarUrl ?? null,
-      role: 'owner',
-      device_token: deviceToken,
-    })
-    .select()
-    .single()
+  // 3. Create initial invite token
+  const token = generateRandomToken(20)
+  const tokenRef = doc(collection(db, 'rooms', roomId, 'invite_tokens'))
+  const tokenData: InviteToken = {
+    id: tokenRef.id,
+    room_id: roomId,
+    token,
+    created_by: memberId,
+    revoked: false,
+    created_at: now,
+  }
+  await setDoc(tokenRef, tokenData)
 
-  if (memberError || !member) throw new Error(memberError?.message ?? 'Failed to create member')
+  const session: SessionMember = {
+    ...memberData,
+    room: roomData,
+  }
 
-  // 3. Update room.owner_id
-  await supabase.from('rooms').update({ owner_id: member.id }).eq('id', room.id)
-
-  // 4. Auto-generate first invite token
-  await supabase.from('invite_tokens').insert({ room_id: room.id, created_by: member.id })
-
-  const session: SessionMember = { ...member, room: { ...room, owner_id: member.id } }
   saveSession(session)
   return session
+}
+
+// ─── Validate Invite Token ────────────────────────────────────
+export async function validateInviteToken(
+  roomId: string,
+  token: string
+): Promise<{ valid: boolean; room?: Room }> {
+  try {
+    const q = query(
+      collection(db, 'rooms', roomId, 'invite_tokens'),
+      where('token', '==', token),
+      where('revoked', '==', false)
+    )
+    const tokenSnap = await getDocs(q)
+    if (tokenSnap.empty) {
+      return { valid: false }
+    }
+
+    const roomSnap = await getDoc(doc(db, 'rooms', roomId))
+    if (!roomSnap.exists()) {
+      return { valid: false }
+    }
+
+    return {
+      valid: true,
+      room: { id: roomSnap.id, ...roomSnap.data() } as Room,
+    }
+  } catch (err) {
+    console.error('Validate invite token error:', err)
+    return { valid: false }
+  }
 }
 
 // ─── Join room via invite token ────────────────────────────────
@@ -133,68 +180,36 @@ export async function joinRoom(
   memberName: string,
   avatarUrl?: string
 ): Promise<SessionMember> {
+  await ensureAnonymousUser()
   const deviceToken = generateDeviceToken()
   saveDeviceToken(deviceToken)
 
-  // Try RPC first for atomic transaction
-  try {
-    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('join_room_with_invite', {
-      p_room_id: roomId,
-      p_invite_token: inviteToken,
-      p_name: memberName,
-      p_avatar_url: avatarUrl ?? null,
-      p_device_token: deviceToken,
-    })
-
-    if (!rpcError && rpcData?.room && rpcData?.member) {
-      const session: SessionMember = {
-        ...rpcData.member,
-        room: rpcData.room,
-      }
-      saveSession(session)
-      return session
-    }
-  } catch {
-    // Fall back to direct queries below
+  const validation = await validateInviteToken(roomId, inviteToken)
+  if (!validation.valid || !validation.room) {
+    throw new Error('Invite link tidak valid atau sudah kadaluarsa.')
   }
 
-  // Direct queries fallback
-  // 1. Validate token
-  const { data: tokenRow, error: tokenError } = await supabase
-    .from('invite_tokens')
-    .select('*')
-    .eq('room_id', roomId)
-    .eq('token', inviteToken)
-    .eq('revoked', false)
-    .single()
+  const now = new Date().toISOString()
+  const memberRef = doc(collection(db, 'rooms', roomId, 'members'))
+  const memberId = memberRef.id
 
-  if (tokenError || !tokenRow) throw new Error('Invite link tidak valid atau sudah kadaluarsa.')
+  const memberData: Member = {
+    id: memberId,
+    room_id: roomId,
+    name: memberName,
+    avatar_url: avatarUrl ?? null,
+    role: 'contributor',
+    device_token: deviceToken,
+    joined_at: now,
+  }
 
-  // 2. Get room
-  const { data: room, error: roomError } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('id', roomId)
-    .single()
+  await setDoc(memberRef, memberData)
 
-  if (roomError || !room) throw new Error('Room tidak ditemukan.')
+  const session: SessionMember = {
+    ...memberData,
+    room: validation.room,
+  }
 
-  // 3. Insert contributor member
-  const { data: member, error: memberError } = await supabase
-    .from('members')
-    .insert({
-      room_id: roomId,
-      name: memberName,
-      avatar_url: avatarUrl ?? null,
-      role: 'contributor',
-      device_token: deviceToken,
-    })
-    .select()
-    .single()
-
-  if (memberError || !member) throw new Error(memberError?.message ?? 'Gagal bergabung ke room')
-
-  const session: SessionMember = { ...member, room }
   saveSession(session)
   return session
 }
@@ -204,47 +219,59 @@ export async function generateInviteToken(
   roomId: string,
   memberId: string
 ): Promise<string> {
-  const { data, error } = await supabase
-    .from('invite_tokens')
-    .insert({ room_id: roomId, created_by: memberId })
-    .select('token')
-    .single()
-
-  if (error || !data) throw new Error('Gagal membuat invite token')
-  return data.token
+  const token = generateRandomToken(20)
+  const tokenRef = doc(collection(db, 'rooms', roomId, 'invite_tokens'))
+  const tokenData: InviteToken = {
+    id: tokenRef.id,
+    room_id: roomId,
+    token,
+    created_by: memberId,
+    revoked: false,
+    created_at: new Date().toISOString(),
+  }
+  await setDoc(tokenRef, tokenData)
+  return token
 }
 
 // ─── Revoke invite token (owner only) ─────────────────────────
-export async function revokeInviteToken(tokenId: string): Promise<void> {
-  const { error } = await supabase
-    .from('invite_tokens')
-    .update({ revoked: true })
-    .eq('id', tokenId)
-
-  if (error) throw new Error('Gagal merevoke token')
+export async function revokeInviteToken(roomId: string, tokenId: string): Promise<void> {
+  const tokenRef = doc(db, 'rooms', roomId, 'invite_tokens', tokenId)
+  await updateDoc(tokenRef, { revoked: true })
 }
 
 // ─── Get all members in a room (safe profile fields only) ─────
 export async function getRoomMembers(roomId: string): Promise<Member[]> {
-  const { data, error } = await supabase
-    .from('members')
-    .select('id, room_id, name, avatar_url, role, joined_at')
-    .eq('room_id', roomId)
-    .order('joined_at', { ascending: true })
-
-  if (error) throw new Error(error.message)
-  return (data as unknown as Member[]) ?? []
+  try {
+    const membersSnap = await getDocs(collection(db, 'rooms', roomId, 'members'))
+    return membersSnap.docs.map(d => {
+      const data = d.data()
+      return {
+        id: d.id,
+        room_id: roomId,
+        name: data.name || 'Teman',
+        avatar_url: data.avatar_url || null,
+        role: data.role || 'contributor',
+        device_token: '', // Sanitize device_token for privacy
+        joined_at: data.joined_at || '',
+      } as Member
+    })
+  } catch (err) {
+    console.error('getRoomMembers error:', err)
+    return []
+  }
 }
 
 // ─── Get active invite tokens for a room (owner view) ─────────
-export async function getActiveInviteTokens(roomId: string) {
-  const { data, error } = await supabase
-    .from('invite_tokens')
-    .select('*')
-    .eq('room_id', roomId)
-    .eq('revoked', false)
-    .order('created_at', { ascending: false })
-
-  if (error) throw new Error(error.message)
-  return data ?? []
+export async function getActiveInviteTokens(roomId: string): Promise<InviteToken[]> {
+  try {
+    const q = query(
+      collection(db, 'rooms', roomId, 'invite_tokens'),
+      where('revoked', '==', false)
+    )
+    const snap = await getDocs(q)
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as InviteToken))
+  } catch (err) {
+    console.error('getActiveInviteTokens error:', err)
+    return []
+  }
 }

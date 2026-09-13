@@ -2,9 +2,16 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Heart, Plus, Calendar, Sparkles, Send, Loader2 } from 'lucide-react'
+import { Heart, Calendar, Sparkles, Send, Loader2 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
-import { supabase } from '@/lib/supabase/client'
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import type { LittleThing } from '@/types/database'
 
 export default function LittleThingsPage() {
@@ -21,15 +28,21 @@ export default function LittleThingsPage() {
     if (!params.roomId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('little_things')
-        .select('*')
-        .eq('room_id', params.roomId)
-        .order('created_at', { ascending: false })
+      const roomId = params.roomId
+      const thingsRef = collection(db, 'rooms', roomId, 'little_things')
+      let list: LittleThing[] = []
 
-      if (!error && data) {
-        setItems(data as LittleThing[])
+      try {
+        const q = query(thingsRef, orderBy('created_at', 'desc'))
+        const snap = await getDocs(q)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as LittleThing))
+      } catch {
+        const snap = await getDocs(thingsRef)
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() } as LittleThing))
+        list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       }
+
+      setItems(list)
     } catch (err) {
       console.error('Failed to load little things:', err)
     } finally {
@@ -44,20 +57,19 @@ export default function LittleThingsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!text.trim()) return
-    if (!session) return
+    if (!session || !params.roomId) return
 
     setSubmitting(true)
     setError('')
 
     try {
-      const { error: insertError } = await supabase.from('little_things').insert({
+      await addDoc(collection(db, 'rooms', params.roomId, 'little_things'), {
         room_id: params.roomId,
         text: text.trim(),
         date: new Date().toISOString().split('T')[0],
         created_by: session.id,
+        created_at: new Date().toISOString(),
       })
-
-      if (insertError) throw new Error(insertError.message)
 
       setText('')
       loadItems()
