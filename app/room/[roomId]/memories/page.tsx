@@ -14,6 +14,15 @@ import {
   Filter,
   Sparkles,
   Camera,
+  Pencil,
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
+  HelpCircle,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Download,
 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
 import {
@@ -22,6 +31,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   orderBy,
   arrayUnion,
@@ -32,13 +42,43 @@ import { uploadPhoto, getMediaUrl } from '@/lib/storage'
 import JoyDatePicker from '@/components/ui/JoyDatePicker'
 import type { Memory, PhotoItem } from '@/types/database'
 
-// Kategori warna psikologi kebahagiaan
-const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  Nongkrong: { bg: '#FFE8B3', text: '#78350f', dot: '#FFD97D' },
-  Liburan:   { bg: '#CDE7D0', text: '#1b4d3e', dot: '#A8D5BA' },
-  Kuliner:   { bg: '#FFB4A2', text: '#9a3412', dot: '#FF8C69' },
-  Perayaan:  { bg: '#CFE8F3', text: '#075985', dot: '#7dd3fc' },
-  Random:    { bg: '#F3E8FF', text: '#6b21a8', dot: '#d8b4fe' },
+// Kategori warna psikologi kebahagiaan & gradasi card
+const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string; cardGradient: string; border: string }> = {
+  Nongkrong: {
+    bg: '#FFE8B3',
+    text: '#78350f',
+    dot: '#FFD97D',
+    cardGradient: 'linear-gradient(180deg, #FFFFFF 0%, #FFF9EC 100%)',
+    border: 'rgba(255, 217, 125, 0.65)',
+  },
+  Liburan: {
+    bg: '#CDE7D0',
+    text: '#1b4d3e',
+    dot: '#A8D5BA',
+    cardGradient: 'linear-gradient(180deg, #FFFFFF 0%, #F2FAF4 100%)',
+    border: 'rgba(168, 213, 186, 0.65)',
+  },
+  Kuliner: {
+    bg: '#FFB4A2',
+    text: '#9a3412',
+    dot: '#FF8C69',
+    cardGradient: 'linear-gradient(180deg, #FFFFFF 0%, #FFF5F2 100%)',
+    border: 'rgba(255, 140, 105, 0.6)',
+  },
+  Perayaan: {
+    bg: '#CFE8F3',
+    text: '#075985',
+    dot: '#7dd3fc',
+    cardGradient: 'linear-gradient(180deg, #FFFFFF 0%, #F0F8FC 100%)',
+    border: 'rgba(125, 211, 252, 0.65)',
+  },
+  Random: {
+    bg: '#F3E8FF',
+    text: '#6b21a8',
+    dot: '#d8b4fe',
+    cardGradient: 'linear-gradient(180deg, #FFFFFF 0%, #FAF5FF 100%)',
+    border: 'rgba(216, 180, 254, 0.65)',
+  },
 }
 
 export default function MemoriesPage() {
@@ -50,7 +90,7 @@ export default function MemoriesPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [filterCategory, setFilterCategory] = useState<string>('all')
 
-  // Form state
+  // Form state (Tambah)
   const [title, setTitle] = useState('')
   const [caption, setCaption] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -61,7 +101,29 @@ export default function MemoriesPage() {
   const [uploadStatus, setUploadStatus] = useState('')
   const [formError, setFormError] = useState('')
 
+  // Edit state
+  const [editingMemory, setEditingMemory] = useState<Memory | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editCaption, setEditCaption] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editCategory, setEditCategory] = useState('Nongkrong')
+  const [existingPhotos, setExistingPhotos] = useState<PhotoItem[]>([])
+  const [newEditFiles, setNewEditFiles] = useState<File[]>([])
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState('')
+
+  // Delete state
+  const [deletingMemory, setDeletingMemory] = useState<Memory | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Lightbox Preview state (Modern Clean Minimalist)
+  const [previewMemory, setPreviewMemory] = useState<Memory | null>(null)
+  const [previewPhotoIndex, setPreviewPhotoIndex] = useState<number>(0)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const editFileInputRef = useRef<HTMLInputElement>(null)
 
   const loadMemories = async () => {
     if (!params.roomId) return
@@ -76,7 +138,6 @@ export default function MemoriesPage() {
         const snap = await getDocs(q)
         list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Memory))
       } catch {
-        // Fallback without index
         const snap = await getDocs(memoriesRef)
         list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Memory))
         list.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
@@ -94,6 +155,47 @@ export default function MemoriesPage() {
     loadMemories()
   }, [params.roomId])
 
+  // Keyboard navigation & body scroll lock for Lightbox
+  useEffect(() => {
+    if (!previewMemory) return
+    const photos = previewMemory.photos ?? []
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewMemory(null)
+      } else if (e.key === 'ArrowLeft' && photos.length > 1) {
+        setPreviewPhotoIndex(prev => (prev > 0 ? prev - 1 : photos.length - 1))
+      } else if (e.key === 'ArrowRight' && photos.length > 1) {
+        setPreviewPhotoIndex(prev => (prev < photos.length - 1 ? prev + 1 : 0))
+      }
+    }
+
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [previewMemory])
+
+  // Download photo handler
+  const handleDownloadPhoto = (url: string, title: string, index: number) => {
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      const safeTitle = (title || 'kenangan').replace(/[^a-zA-Z0-9_-]/g, '_')
+      a.download = `${safeTitle}-${index + 1}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
+  // File handling for Add
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
@@ -105,6 +207,23 @@ export default function MemoriesPage() {
     setSelectedFiles(prev => prev.filter((_, i) => i !== idx))
   }
 
+  // File handling for Edit
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files)
+      setNewEditFiles(prev => [...prev, ...files])
+    }
+  }
+
+  const removeExistingPhoto = (idx: number) => {
+    setExistingPhotos(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const removeNewEditFile = (idx: number) => {
+    setNewEditFiles(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  // Submit Add
   const handleSubmitMemory = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
@@ -121,10 +240,9 @@ export default function MemoriesPage() {
       const newMemoryRef = doc(collection(db, 'rooms', roomId, 'memories'))
       const memoryId = newMemoryRef.id
 
-      // 1. Upload photos in PARALLEL for blazing-fast performance
       let photos: PhotoItem[] = []
       if (selectedFiles.length > 0) {
-        setUploadStatus(`Mengunggah ${selectedFiles.length} foto...`)
+        setUploadStatus(`Mengompres & menyimpan ${selectedFiles.length} foto...`)
         const uploadPromises = selectedFiles.map(async (file, i) => {
           const uploadRes = await uploadPhoto(file, roomId, memoryId)
           return {
@@ -173,6 +291,115 @@ export default function MemoriesPage() {
     }
   }
 
+  // Start Edit
+  const handleStartEdit = (memory: Memory) => {
+    setEditingMemory(memory)
+    setEditTitle(memory.title)
+    setEditCaption(memory.caption || '')
+    setEditDate(memory.date || new Date().toISOString().split('T')[0])
+    setEditLocation(memory.location_name || '')
+    setEditCategory(memory.category || 'Nongkrong')
+    setExistingPhotos(memory.photos || (memory.memory_photos as PhotoItem[]) || [])
+    setNewEditFiles([])
+    setEditError('')
+    setShowConfirmModal(false)
+  }
+
+  // Pre-confirm edit click
+  const handlePreSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editTitle.trim()) {
+      setEditError('Judul kenangan tidak boleh kosong.')
+      return
+    }
+    setEditError('')
+    setShowConfirmModal(true)
+  }
+
+  // Final confirmed save edit
+  const handleConfirmSaveEdit = async () => {
+    if (!editingMemory || !params.roomId) return
+    setSavingEdit(true)
+    setEditError('')
+
+    try {
+      const roomId = params.roomId
+      const memoryId = editingMemory.id
+
+      // Upload new photos if any
+      let newlyUploadedPhotos: PhotoItem[] = []
+      if (newEditFiles.length > 0) {
+        const uploadPromises = newEditFiles.map(async (file, i) => {
+          const uploadRes = await uploadPhoto(file, roomId, memoryId)
+          return {
+            id: `${Date.now()}-new-${i}`,
+            storage_path: uploadRes.storagePath,
+            url: uploadRes.downloadUrl,
+            sort_order: existingPhotos.length + i,
+            is_cover: existingPhotos.length === 0 && i === 0,
+          }
+        })
+        newlyUploadedPhotos = await Promise.all(uploadPromises)
+      }
+
+      const combinedPhotos = [...existingPhotos, ...newlyUploadedPhotos]
+      if (combinedPhotos.length > 0) {
+        combinedPhotos[0].is_cover = true
+      }
+
+      const memoryRef = doc(db, 'rooms', roomId, 'memories', memoryId)
+      await updateDoc(memoryRef, {
+        title: editTitle.trim(),
+        caption: editCaption.trim() || null,
+        date: editDate,
+        location_name: editLocation.trim() || null,
+        category: editCategory,
+        photos: combinedPhotos,
+        updated_at: new Date().toISOString(),
+      })
+
+      // Optimistic update locally
+      setMemories(prev =>
+        prev.map(m => {
+          if (m.id !== memoryId) return m
+          return {
+            ...m,
+            title: editTitle.trim(),
+            caption: editCaption.trim() || null,
+            date: editDate,
+            location_name: editLocation.trim() || null,
+            category: editCategory,
+            photos: combinedPhotos,
+          }
+        })
+      )
+
+      setShowConfirmModal(false)
+      setEditingMemory(null)
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Gagal menyimpan perubahan kenangan.')
+      setShowConfirmModal(false)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // Delete Memory
+  const handleConfirmDelete = async () => {
+    if (!deletingMemory || !params.roomId) return
+    setIsDeleting(true)
+    try {
+      await deleteDoc(doc(db, 'rooms', params.roomId, 'memories', deletingMemory.id))
+      setMemories(prev => prev.filter(m => m.id !== deletingMemory.id))
+      setDeletingMemory(null)
+    } catch (err) {
+      console.error('Delete memory error:', err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Toggle Reaction
   const handleToggleReaction = async (memoryId: string) => {
     if (!session || !params.roomId) return
     try {
@@ -193,7 +420,6 @@ export default function MemoriesPage() {
         })
       }
 
-      // Optimistic update locally
       setMemories(prev =>
         prev.map(m => {
           if (m.id !== memoryId) return m
@@ -218,19 +444,19 @@ export default function MemoriesPage() {
     : memories.filter(m => m.category === filterCategory)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-7">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-7 select-none">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--joy-yellow-light)] text-[var(--joy-charcoal)] mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--joy-yellow-light)] text-[var(--joy-charcoal)] mb-2 shadow-2xs border border-[rgba(255,217,125,0.4)]">
             <Sparkles className="w-3.5 h-3.5 text-[var(--joy-peach)]" />
-            <span>Momen Bahagia Bersama</span>
+            <span>Koleksi Momen Bahagia</span>
           </div>
           <h1
             className="text-2xl sm:text-3xl font-bold flex items-center gap-2"
             style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
           >
-            📸 Galeri Kenangan
+            📸 Galeri Kenangan Bersama
           </h1>
           <p className="text-xs sm:text-sm mt-1 text-[var(--text-secondary)]">
             Setiap gambar menyimpan ribuan tawa dan cerita indah yang kita lalui bersama.
@@ -247,7 +473,7 @@ export default function MemoriesPage() {
           }}
         >
           <Plus className="w-4 h-4" />
-          Tambah Kenangan
+          Tambah Kenangan Baru
         </button>
       </div>
 
@@ -267,7 +493,7 @@ export default function MemoriesPage() {
                   ? {
                       background: catStyle ? catStyle.bg : 'var(--joy-yellow-light)',
                       color: catStyle ? catStyle.text : 'var(--joy-charcoal)',
-                      boxShadow: '0 2px 8px rgba(255,217,125,0.4)',
+                      boxShadow: '0 2px 8px rgba(255,217,125,0.45)',
                       fontWeight: 700,
                     }
                   : {
@@ -287,7 +513,7 @@ export default function MemoriesPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-72 skeleton rounded-3xl" />
+            <div key={i} className="h-80 skeleton rounded-3xl" />
           ))}
         </div>
       ) : filteredMemories.length === 0 ? (
@@ -330,38 +556,66 @@ export default function MemoriesPage() {
             return (
               <div
                 key={m.id}
-                className="group rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 flex flex-col"
+                className="group rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1.5 flex flex-col relative"
                 style={{
-                  background: 'linear-gradient(180deg, #FFFFFF 0%, #FFFDF9 100%)',
-                  border: '1.5px solid rgba(255, 217, 125, 0.45)',
-                  boxShadow: '0 8px 24px -4px rgba(255, 140, 105, 0.12), 0 2px 6px rgba(0,0,0,0.03)',
+                  background: catStyle.cardGradient,
+                  border: `1.5px solid ${catStyle.border}`,
+                  boxShadow: '0 10px 30px -6px rgba(255, 180, 162, 0.18), 0 2px 8px rgba(0,0,0,0.03)',
                 }}
               >
+                {/* Washi Tape Scrapbook Decoration */}
+                <div
+                  className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-20 h-4.5 bg-white/75 backdrop-blur-xs border border-white/80 shadow-2xs rotate-[-1.5deg] rounded-xs z-20 pointer-events-none"
+                  style={{
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                  }}
+                />
+
                 {/* Gradient top decorative strip */}
                 <div className="h-1.5" style={{ background: 'var(--gradient-memory)' }} />
 
-                {/* Photo Display */}
-                <div className="relative aspect-4/3 overflow-hidden bg-[var(--surface-elevated)]">
+                {/* Photo Display with Click to Preview */}
+                <div
+                  onClick={() => {
+                    if (photos.length > 0) {
+                      setPreviewMemory(m)
+                      setPreviewPhotoIndex(0)
+                    }
+                  }}
+                  className={`relative aspect-4/3 overflow-hidden bg-[var(--surface-elevated)] ${
+                    photos.length > 0 ? 'cursor-pointer group/photo' : ''
+                  }`}
+                >
                   {cover ? (
                     <img
                       src={getMediaUrl(cover)}
                       alt={m.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover:scale-105 group-hover/photo:scale-108 transition-transform duration-500"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[var(--joy-yellow-light)]/20 to-[var(--joy-peach-light)]/30 text-[var(--joy-peach)]">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[var(--joy-yellow-light)]/30 to-[var(--joy-peach-light)]/40 text-[var(--joy-peach)]">
                       <Camera className="w-12 h-12 opacity-50 mb-1" />
                       <span className="text-[11px] font-semibold opacity-70">Tanpa Foto</span>
                     </div>
                   )}
 
                   {/* Gradient shadow overlay on photo */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+
+                  {/* Hover Prompt - Minimalist Eye Badge */}
+                  {photos.length > 0 && (
+                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/photo:opacity-100 transition-all duration-300 flex items-center justify-center pointer-events-none z-5">
+                      <div className="px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-[var(--joy-charcoal)] text-xs font-bold shadow-lg flex items-center gap-1.5 transform translate-y-1.5 group-hover/photo:translate-y-0 transition-transform duration-300">
+                        <Eye className="w-3.5 h-3.5 text-[var(--joy-peach)]" />
+                        <span>Lihat Foto</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Category badge */}
                   {m.category && (
                     <span
-                      className="absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold shadow-xs flex items-center gap-1 backdrop-blur-xs"
+                      className="absolute top-3 left-3 px-2.5 py-1 rounded-xl text-[10px] font-bold shadow-xs flex items-center gap-1 backdrop-blur-md z-10"
                       style={{
                         background: catStyle.bg,
                         color: catStyle.text,
@@ -372,16 +626,40 @@ export default function MemoriesPage() {
                     </span>
                   )}
 
+                  {/* Action Buttons Overlay (Edit & Delete) */}
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleStartEdit(m)
+                      }}
+                      title="Edit Kenangan"
+                      className="w-8 h-8 rounded-full bg-white/85 hover:bg-white text-[var(--joy-charcoal)] shadow-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-xs"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-[var(--joy-charcoal)]" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeletingMemory(m)
+                      }}
+                      title="Hapus Kenangan"
+                      className="w-8 h-8 rounded-full bg-white/85 hover:bg-red-50 text-[var(--danger)] shadow-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
                   {/* Multiple photos indicator */}
                   {photos.length > 1 && (
-                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded-xl bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold flex items-center gap-1">
+                    <span className="absolute bottom-10 right-3 px-2.5 py-0.5 rounded-xl bg-black/65 backdrop-blur-md text-white text-[10px] font-semibold flex items-center gap-1 z-10">
                       <ImageIcon className="w-3 h-3" />
                       +{photos.length - 1} foto
                     </span>
                   )}
 
                   {/* Title overlay on photo bottom */}
-                  <div className="absolute bottom-2.5 left-3 right-3 text-white">
+                  <div className="absolute bottom-2.5 left-3 right-3 text-white z-10">
                     <h3 className="text-sm font-bold leading-snug drop-shadow-sm truncate">
                       {m.title}
                     </h3>
@@ -424,10 +702,11 @@ export default function MemoriesPage() {
                     {/* Like button with heart beat */}
                     <button
                       onClick={() => handleToggleReaction(m.id)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer hover:scale-105 active:scale-95"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-2xs"
                       style={{
-                        background: hasLiked ? 'var(--favorite-tint)' : 'transparent',
+                        background: hasLiked ? 'var(--favorite-tint)' : 'rgba(255,255,255,0.7)',
                         color: hasLiked ? 'var(--favorite)' : 'var(--text-muted)',
+                        border: '1px solid rgba(0,0,0,0.05)',
                       }}
                     >
                       <Heart className={`w-4 h-4 ${hasLiked ? 'fill-current animate-pulse' : ''}`} />
@@ -441,7 +720,7 @@ export default function MemoriesPage() {
         </div>
       )}
 
-      {/* Modal Tambah Kenangan */}
+      {/* ── Modal Tambah Kenangan ── */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
           <div
@@ -496,7 +775,7 @@ export default function MemoriesPage() {
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Contoh: Liburan ke Dufan, Nonton Konser Bareng"
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all select-text"
                 />
               </div>
 
@@ -510,11 +789,11 @@ export default function MemoriesPage() {
                   onChange={e => setCaption(e.target.value)}
                   rows={3}
                   placeholder="Tuliskan cerita singkat tentang apa yang membuat momen ini berkesan..."
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all resize-none select-text"
                 />
               </div>
 
-              {/* Tanggal (Custom Aesthetic JoyDatePicker) & Kategori */}
+              {/* Tanggal & Kategori */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <JoyDatePicker
@@ -552,11 +831,11 @@ export default function MemoriesPage() {
                   value={locationName}
                   onChange={e => setLocationName(e.target.value)}
                   placeholder="Contoh: Dufan Ancol, Kopi Kenangan Senopati..."
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all select-text"
                 />
               </div>
 
-              {/* Upload Foto dengan Preview Asli */}
+              {/* Upload Foto */}
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Foto Kenangan
@@ -582,7 +861,6 @@ export default function MemoriesPage() {
                   <span className="text-[10px] text-[var(--text-muted)]">Mendukung banyak foto sekaligus</span>
                 </button>
 
-                {/* File preview thumbnails with REAL IMAGE PREVIEWS */}
                 {selectedFiles.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 mt-3">
                     {selectedFiles.map((f, i) => {
@@ -647,6 +925,534 @@ export default function MemoriesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Edit Kenangan ── */}
+      {editingMemory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div
+            className="rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            style={{
+              background: '#FFFFFF',
+              border: '1.5px solid rgba(255, 180, 162, 0.65)',
+              boxShadow: '0 20px 50px -10px rgba(255, 140, 105, 0.35)',
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs"
+                  style={{ background: 'var(--gradient-plan)' }}
+                >
+                  <Pencil className="w-5 h-5 text-[var(--joy-charcoal)]" />
+                </div>
+                <div>
+                  <h2
+                    className="text-base font-bold leading-tight text-[var(--joy-charcoal)]"
+                    style={{ fontFamily: 'var(--font-heading)' }}
+                  >
+                    Edit Kenangan & Foto
+                  </h2>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Perbarui detail momen atau atur foto kenangan</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingMemory(null)}
+                className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handlePreSaveEdit} className="space-y-4">
+              {/* Judul */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Judul Momen *
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  placeholder="Judul kenangan..."
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all select-text"
+                />
+              </div>
+
+              {/* Catatan / Caption */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Cerita / Catatan
+                </label>
+                <textarea
+                  value={editCaption}
+                  onChange={e => setEditCaption(e.target.value)}
+                  rows={3}
+                  placeholder="Cerita singkat momen ini..."
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all resize-none select-text"
+                />
+              </div>
+
+              {/* Tanggal & Kategori */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <JoyDatePicker
+                    label="Tanggal"
+                    value={editDate}
+                    onChange={newDate => setEditDate(newDate)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                    Kategori
+                  </label>
+                  <select
+                    value={editCategory}
+                    onChange={e => setEditCategory(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all cursor-pointer font-medium"
+                  >
+                    <option value="Nongkrong">☕ Nongkrong</option>
+                    <option value="Liburan">🏖️ Liburan</option>
+                    <option value="Kuliner">🍕 Kuliner</option>
+                    <option value="Perayaan">🎉 Perayaan</option>
+                    <option value="Random">✨ Random</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Lokasi */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Lokasi
+                </label>
+                <input
+                  type="text"
+                  value={editLocation}
+                  onChange={e => setEditLocation(e.target.value)}
+                  placeholder="Lokasi tempat..."
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all select-text"
+                />
+              </div>
+
+              {/* Foto yang Sudah Ada */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Foto Saat Ini ({existingPhotos.length})
+                </label>
+                {existingPhotos.length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)] italic">Tidak ada foto tersimpan.</p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                    {existingPhotos.map((p, i) => (
+                      <div
+                        key={p.id || i}
+                        className="group relative aspect-square rounded-2xl overflow-hidden border-2 border-[var(--border)] shadow-2xs bg-[var(--surface-elevated)]"
+                      >
+                        <img
+                          src={getMediaUrl(p.url || p.storage_path)}
+                          alt={`Foto ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {i === 0 && (
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md bg-black/70 text-white text-[8px] font-bold">
+                            Sampul
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeExistingPhoto(i)}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/75 hover:bg-[var(--danger)] text-white flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                          title="Hapus foto ini"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tambah Foto Baru */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Tambah Foto Baru
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  ref={editFileInputRef}
+                  onChange={handleEditFileChange}
+                  className="hidden"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => editFileInputRef.current?.click()}
+                  className="w-full py-3.5 border-2 border-dashed border-[var(--joy-peach)]/60 hover:border-[var(--joy-peach)] rounded-2xl flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)] bg-[var(--joy-yellow-light)]/20 hover:bg-[var(--joy-yellow-light)]/40 transition-all cursor-pointer"
+                >
+                  <UploadCloud className="w-4 h-4 text-[var(--joy-peach)]" />
+                  <span className="font-semibold text-[var(--joy-charcoal)]">Pilih foto tambahan dari galeri</span>
+                </button>
+
+                {newEditFiles.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 mt-2.5">
+                    {newEditFiles.map((f, i) => {
+                      const objectUrl = URL.createObjectURL(f)
+                      return (
+                        <div
+                          key={i}
+                          className="group relative aspect-square rounded-2xl overflow-hidden border-2 border-[var(--joy-peach)] shadow-xs bg-[var(--surface-elevated)]"
+                        >
+                          <img
+                            src={objectUrl}
+                            alt={f.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-1 left-1.5 text-[8px] font-bold text-white bg-black/60 px-1 rounded-sm">
+                            Baru
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeNewEditFile(i)}
+                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-[var(--danger)] text-white flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                            title="Batal tambah foto"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setEditingMemory(null)}
+                  className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer hover:opacity-95 active:scale-95 shadow-sm"
+                  style={{
+                    background: 'var(--gradient-plan)',
+                    color: 'var(--joy-charcoal)',
+                    boxShadow: '0 4px 14px rgba(255, 217, 125, 0.4)',
+                  }}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialog Konfirmasi Sebelum Menyimpan Edit ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-in fade-in">
+          <div
+            className="rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center animate-fade-in-up"
+            style={{
+              background: '#FFFFFF',
+              border: '2px solid rgba(255, 217, 125, 0.8)',
+              boxShadow: '0 25px 60px -10px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div
+              className="w-14 h-14 rounded-full mx-auto flex items-center justify-center shadow-xs"
+              style={{ background: 'var(--joy-yellow-light)' }}
+            >
+              <HelpCircle className="w-8 h-8 text-[var(--joy-peach)]" />
+            </div>
+
+            <div>
+              <h3
+                className="text-base font-bold text-[var(--joy-charcoal)]"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                Konfirmasi Perubahan
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+                Apakah kamu yakin ingin menyimpan perubahan pada kenangan <span className="font-bold text-[var(--joy-charcoal)]">&ldquo;{editTitle}&rdquo;</span>?
+              </p>
+            </div>
+
+            <div className="bg-[var(--surface-elevated)] p-3 rounded-2xl text-[11px] text-left space-y-1 text-[var(--text-secondary)]">
+              <p>📅 <strong>Tanggal:</strong> {editDate}</p>
+              <p>🏷️ <strong>Kategori:</strong> {editCategory}</p>
+              <p>🖼️ <strong>Total Foto:</strong> {existingPhotos.length + newEditFiles.length} foto</p>
+              {editLocation && <p>📍 <strong>Lokasi:</strong> {editLocation}</p>}
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={savingEdit}
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--border)] transition-colors cursor-pointer"
+              >
+                Periksa Lagi
+              </button>
+              <button
+                type="button"
+                disabled={savingEdit}
+                onClick={handleConfirmSaveEdit}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:opacity-95 shadow-sm text-[var(--joy-charcoal)] disabled:opacity-50"
+                style={{ background: 'var(--gradient-memory)' }}
+              >
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-[#2d6a4a]" />
+                    <span>Ya, Simpan</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialog Konfirmasi Hapus Kenangan ── */}
+      {deletingMemory && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-in fade-in">
+          <div
+            className="rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center animate-fade-in-up"
+            style={{
+              background: '#FFFFFF',
+              border: '2px solid rgba(248, 113, 113, 0.4)',
+              boxShadow: '0 25px 60px -10px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div className="w-14 h-14 rounded-full mx-auto flex items-center justify-center bg-red-100 text-[var(--danger)]">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-[var(--joy-charcoal)]">
+                Hapus Kenangan Ini?
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+                Kenangan <span className="font-bold text-[var(--danger)]">&ldquo;{deletingMemory.title}&rdquo;</span> beserta foto-fotonya akan dihapus dari ruang kenangan. Tindakan ini tidak dapat dibatalkan.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingMemory(null)}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--border)] transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:opacity-90 shadow-sm bg-[var(--danger)] text-white disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  'Ya, Hapus'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modern Clean Minimalist Photo Lightbox ── */}
+      {previewMemory && (
+        <div
+          className="fixed inset-0 z-70 flex flex-col items-center justify-between p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in-fast select-none"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreviewMemory(null)
+          }}
+        >
+          {/* Header Bar */}
+          <div className="w-full max-w-4xl flex items-center justify-between text-white py-1.5 z-10">
+            <div className="flex items-center gap-2">
+              {previewMemory.category && (
+                <span
+                  className="px-2.5 py-1 rounded-xl text-[10px] font-bold shadow-xs backdrop-blur-md"
+                  style={{
+                    background: CATEGORY_STYLES[previewMemory.category]?.bg || 'rgba(255,255,255,0.2)',
+                    color: CATEGORY_STYLES[previewMemory.category]?.text || '#FFFFFF',
+                  }}
+                >
+                  {previewMemory.category}
+                </span>
+              )}
+              <span className="text-xs text-white/75 font-medium">
+                {(previewMemory.photos ?? []).length > 1
+                  ? `${previewPhotoIndex + 1} / ${(previewMemory.photos ?? []).length} Foto`
+                  : 'Foto Kenangan'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Download Photo Button */}
+              {previewMemory.photos && previewMemory.photos[previewPhotoIndex] && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const activeP = previewMemory.photos![previewPhotoIndex]
+                    const url = getMediaUrl(activeP.url || activeP.storage_path)
+                    handleDownloadPhoto(url, previewMemory.title, previewPhotoIndex)
+                  }}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                  title="Unduh Foto Kenangan"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setPreviewMemory(null)}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 text-white backdrop-blur-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                title="Tutup (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Main Photo Area with Navigation Arrows */}
+          <div
+            className="relative flex-1 w-full max-w-4xl flex items-center justify-center my-auto min-h-0 py-2"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPreviewMemory(null)
+            }}
+          >
+            {/* Previous Arrow Button */}
+            {(previewMemory.photos ?? []).length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPreviewPhotoIndex((prev) =>
+                    prev > 0 ? prev - 1 : (previewMemory.photos?.length || 1) - 1
+                  )
+                }}
+                className="absolute left-1 sm:left-3 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/75 text-white backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-xl border border-white/15 cursor-pointer"
+                title="Foto Sebelumnya (←)"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Photo Element */}
+            <div className="animate-lightbox-in flex items-center justify-center max-h-full max-w-full">
+              {previewMemory.photos && previewMemory.photos[previewPhotoIndex] ? (
+                <img
+                  key={`${previewMemory.id}-${previewPhotoIndex}`}
+                  src={getMediaUrl(
+                    previewMemory.photos[previewPhotoIndex].url ||
+                    previewMemory.photos[previewPhotoIndex].storage_path
+                  )}
+                  alt={previewMemory.title}
+                  className="max-h-[62vh] sm:max-h-[70vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl transition-all duration-300"
+                  style={{
+                    boxShadow: '0 25px 60px -10px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.1)',
+                  }}
+                />
+              ) : (
+                <div className="w-64 h-64 rounded-2xl bg-white/10 flex flex-col items-center justify-center text-white/60">
+                  <Camera className="w-12 h-12 mb-2 opacity-50" />
+                  <span className="text-xs">Foto tidak tersedia</span>
+                </div>
+              )}
+            </div>
+
+            {/* Next Arrow Button */}
+            {(previewMemory.photos ?? []).length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPreviewPhotoIndex((prev) =>
+                    prev < (previewMemory.photos?.length || 1) - 1 ? prev + 1 : 0
+                  )
+                }}
+                className="absolute right-1 sm:right-3 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/75 text-white backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-xl border border-white/15 cursor-pointer"
+                title="Foto Selanjutnya (→)"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
+          </div>
+
+          {/* Dots Indicator */}
+          {(previewMemory.photos ?? []).length > 1 && (
+            <div className="flex items-center gap-1.5 py-1 z-10">
+              {previewMemory.photos!.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setPreviewPhotoIndex(idx)}
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    idx === previewPhotoIndex
+                      ? 'w-6 bg-white shadow-xs'
+                      : 'w-2 bg-white/35 hover:bg-white/60'
+                  }`}
+                  title={`Foto ke-${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Bottom Floating Info Card */}
+          <div className="w-full max-w-2xl px-4 py-3 rounded-2xl bg-black/55 backdrop-blur-md border border-white/10 text-white space-y-1.5 shadow-2xl z-10 mt-1">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm sm:text-base font-bold truncate text-white drop-shadow-xs">
+                {previewMemory.title}
+              </h2>
+              <div className="flex items-center gap-2.5 text-[11px] text-white/75 shrink-0 font-medium">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--joy-yellow)]" />
+                  {previewMemory.date}
+                </span>
+                {previewMemory.location_name && (
+                  <span className="flex items-center gap-1 truncate max-w-[150px]">
+                    <MapPin className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    {previewMemory.location_name}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {previewMemory.caption && (
+              <p className="text-xs text-white/85 line-clamp-3 leading-relaxed italic pt-1 border-t border-white/10">
+                &ldquo;{previewMemory.caption}&rdquo;
+              </p>
+            )}
           </div>
         </div>
       )}

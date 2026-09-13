@@ -222,17 +222,52 @@ body {
 .btn-secondary:hover  { border-color: var(--accent-border); background-color: var(--accent-tint); }
 .btn-secondary:active { transform: scale(0.97); }
 
-/* ── Marquee keyframes ────────────────────────────── */
+/* ── Global Cursor & Selection Tuning ──────────────── */
+body, button, a, div, span, p, h1, h2, h3, h4, h5, h6, section, article, header, nav, footer {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+/* Strictly allow text selection and typing cursor only in inputs */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  cursor: text !important;
+}
+
+button, a, [role="button"], .cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* ── Ultra-Smooth Marquee Keyframes ───────────────── */
 @keyframes marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
 }
+
 .animate-marquee {
-  animation: marquee 35s linear infinite;
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  animation: marquee 60s linear infinite;
 }
+
 .animate-marquee-slow {
-  animation: marquee 55s linear infinite;
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  animation: marquee 85s linear infinite;
 }
+
 .animate-marquee:hover,
 .animate-marquee-slow:hover {
   animation-play-state: paused;
@@ -271,3 +306,26 @@ body {
   transition: filter 0.3s ease, box-shadow 0.3s ease;
 }
 .card-gradient-date:hover { filter: brightness(1.04); box-shadow: 0 8px 32px rgba(207,232,243,0.4); }
+
+/* ── Smooth Modal & Lightbox Pop Animations ──────── */
+@keyframes lightboxIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.animate-lightbox-in {
+  animation: lightboxIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInFast {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in-fast {
+  animation: fadeInFast 0.2s ease-out forwards;
+}

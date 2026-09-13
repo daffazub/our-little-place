@@ -27,35 +27,38 @@ import { getMediaUrl } from '@/lib/storage'
 import type { Memory, Story } from '@/types/database'
 
 /* ────────────────────────────────────────────────────────
-   Count-Up Hook
+   Count-Up Hook (Reliable & Reactive)
 ──────────────────────────────────────────────────────── */
-function useCountUp(target: number, duration = 900) {
-  const [value, setValue] = useState(0)
-  const started = useRef(false)
-  const ref = useRef<HTMLDivElement>(null)
+function useCountUp(target: number, duration = 800) {
+  const [value, setValue] = useState(target)
 
   useEffect(() => {
-    if (started.current) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting || started.current) return
-        started.current = true
-        const start = performance.now()
-        const tick = (now: number) => {
-          const progress = Math.min((now - start) / duration, 1)
-          const eased = 1 - Math.pow(1 - progress, 3)
-          setValue(Math.round(eased * target))
-          if (progress < 1) requestAnimationFrame(tick)
-        }
-        requestAnimationFrame(tick)
-      },
-      { threshold: 0.3 }
-    )
-    if (ref.current) observer.observe(ref.current)
-    return () => observer.disconnect()
+    let startTime: number | null = null
+    const startVal = 0
+
+    if (target === 0) {
+      setValue(0)
+      return
+    }
+
+    let animId: number
+    const tick = (now: number) => {
+      if (!startTime) startTime = now
+      const progress = Math.min((now - startTime) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setValue(Math.round(startVal + target * eased))
+      if (progress < 1) {
+        animId = requestAnimationFrame(tick)
+      } else {
+        setValue(target)
+      }
+    }
+
+    animId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(animId)
   }, [target, duration])
 
-  return { value, ref }
+  return value
 }
 
 /* ────────────────────────────────────────────────────────
@@ -65,18 +68,21 @@ function HeroCard({
   roomName,
   membersCount,
   memoriesCount,
+  photosCount,
 }: {
   roomName: string
   membersCount: number
   memoriesCount: number
+  photosCount: number
 }) {
   const members = useCountUp(membersCount)
   const memories = useCountUp(memoriesCount)
+  const photos = useCountUp(photosCount)
 
   return (
-    <div ref={members.ref}>
+    <div className="select-none cursor-default">
       <section
-        className="relative overflow-hidden rounded-[22px] p-7 sm:p-10 shadow-lg"
+        className="relative overflow-hidden rounded-3xl p-7 sm:p-10 shadow-lg select-none cursor-default"
         style={{ background: 'var(--gradient-hero)' }}
       >
         {/* Decorative blobs */}
@@ -92,8 +98,8 @@ function HeroCard({
         <div className="relative z-10 max-w-xl space-y-4">
           {/* Eyebrow */}
           <div
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm"
-            style={{ background: 'rgba(255,255,255,0.55)', color: 'var(--joy-charcoal)' }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm shadow-2xs"
+            style={{ background: 'rgba(255,255,255,0.7)', color: 'var(--joy-charcoal)' }}
           >
             <Heart className="w-3.5 h-3.5" style={{ color: 'var(--joy-peach)' }} />
             Ruang Kenangan Bersama
@@ -108,28 +114,31 @@ function HeroCard({
           </h1>
 
           {/* Sub-text */}
-          <p className="text-sm sm:text-base leading-relaxed" style={{ color: '#555' }}>
+          <p className="text-sm sm:text-base leading-relaxed text-[#4b5563]">
             Abadikan setiap tawa, cerita, dan momen tak terlupakan bersama orang-orang tersayang.
           </p>
 
           {/* Stats badges */}
           <div className="pt-1 flex flex-wrap gap-3">
             <div
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-sm"
-              style={{ background: 'rgba(255,255,255,0.6)', color: 'var(--joy-charcoal)' }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-xs"
+              style={{ background: 'rgba(255,255,255,0.75)', color: 'var(--joy-charcoal)' }}
             >
-              <Users className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <Users className="w-4 h-4 text-[var(--joy-peach)]" />
               <span>
-                <span className="text-lg font-bold">{members.value}</span> Sahabat
+                <span className="text-lg font-bold">{members}</span> Sahabat
               </span>
             </div>
             <div
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-sm"
-              style={{ background: 'rgba(255,255,255,0.6)', color: 'var(--joy-charcoal)' }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-xs"
+              style={{ background: 'rgba(255,255,255,0.75)', color: 'var(--joy-charcoal)' }}
             >
-              <ImageIcon className="w-4 h-4" style={{ color: 'var(--joy-peach)' }} />
+              <ImageIcon className="w-4 h-4 text-[var(--accent)]" />
               <span>
-                <span className="text-lg font-bold">{memories.value}</span> Kenangan
+                <span className="text-lg font-bold">{memories}</span> Kenangan
+                {photos > 0 && (
+                  <span className="text-xs opacity-75 ml-1 font-medium">({photos} Foto)</span>
+                )}
               </span>
             </div>
           </div>
@@ -164,27 +173,41 @@ function PhotoMarquee({
     return () => observer.disconnect()
   }, [])
 
-  const allPhotos = memories.flatMap((m) =>
-    (m.photos ?? []).map((p) => ({ url: p.url || p.storage_path, title: m.title }))
-  )
+  // Extract all photos, randomly shuffle them, and limit to max 20 photos
+  const selectedPhotos = React.useMemo(() => {
+    const raw = memories.flatMap((m) =>
+      (m.photos ?? []).map((p) => ({
+        url: p.url || p.storage_path,
+        title: m.title,
+      }))
+    )
+
+    // Random shuffle so it's always fresh and not always the same photos
+    const shuffled = [...raw].sort(() => Math.random() - 0.5)
+
+    // Limit to max 20 photos per user request
+    return shuffled.slice(0, 20)
+  }, [memories])
 
   // Empty state
-  if (allPhotos.length === 0) {
+  if (selectedPhotos.length === 0) {
     return (
-      <section className="rounded-[22px] border-2 border-dashed py-12 text-center space-y-3"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+      <section
+        className="rounded-3xl border-2 border-dashed py-12 text-center space-y-3 select-none cursor-default"
+        style={{ borderColor: 'rgba(255, 217, 125, 0.6)', background: 'var(--surface)' }}
       >
-        <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+        <div
+          className="w-16 h-16 rounded-full mx-auto flex items-center justify-center shadow-xs"
           style={{ background: 'var(--joy-yellow-light)' }}
         >
           <ImageIcon className="w-7 h-7" style={{ color: 'var(--joy-peach)' }} />
         </div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-sm font-semibold text-[var(--text-secondary)]">
           Belum ada kenangan — yuk unggah momen pertama kalian!
         </p>
         <Link
           href={`/room/${roomId}/memories`}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 shadow-xs cursor-pointer"
           style={{ background: 'var(--gradient-memory)', color: 'var(--joy-charcoal)' }}
         >
           <Plus className="w-3.5 h-3.5" /> Tambah Kenangan
@@ -194,49 +217,70 @@ function PhotoMarquee({
   }
 
   // < 3 photos → static grid fallback
-  if (allPhotos.length < 3) {
+  if (selectedPhotos.length < 3) {
     return (
-      <section>
+      <section className="select-none cursor-default">
         <div className="flex gap-3">
-          {allPhotos.map((p, i) => (
-            <div
+          {selectedPhotos.map((p, i) => (
+            <Link
               key={i}
-              className="h-36 flex-1 rounded-2xl overflow-hidden shadow-sm"
+              href={`/room/${roomId}/memories`}
+              className="h-36 flex-1 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all cursor-pointer relative group block"
             >
               <img
                 src={getMediaUrl(p.url)}
                 alt={p.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
-            </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5">
+                <span className="text-xs font-bold text-white truncate">{p.title}</span>
+              </div>
+            </Link>
           ))}
         </div>
       </section>
     )
   }
 
-  // Marquee (duplicate for infinite loop)
-  const displayPhotos = [...allPhotos, ...allPhotos]
-  const animClass = allPhotos.length < 5 ? 'animate-marquee-slow' : 'animate-marquee'
+  // Marquee (duplicate for seamless infinite loop)
+  const displayPhotos = [...selectedPhotos, ...selectedPhotos]
+  const animClass = selectedPhotos.length < 5 ? 'animate-marquee-slow' : 'animate-marquee'
 
   return (
-    <section ref={containerRef} className="overflow-hidden rounded-[22px] select-none">
+    <section
+      ref={containerRef}
+      className="overflow-hidden rounded-3xl select-none cursor-default"
+      style={{
+        maskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)',
+      }}
+    >
       <div
-        className={`flex gap-3 w-max ${animClass}`}
+        className={`flex gap-3.5 w-max ${animClass}`}
         style={{ animationPlayState: paused ? 'paused' : 'running' }}
       >
         {displayPhotos.map((p, i) => (
-          <div
+          <Link
             key={i}
-            className="h-44 w-64 rounded-2xl overflow-hidden shrink-0 shadow-sm hover:shadow-md transition-shadow"
+            href={`/room/${roomId}/memories`}
+            className="h-44 w-64 rounded-2xl overflow-hidden shrink-0 shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer relative group block border border-[rgba(255,217,125,0.4)]"
+            style={{
+              background: 'var(--surface)',
+            }}
           >
             <img
               src={getMediaUrl(p.url)}
               alt={p.title}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
             />
-          </div>
+            {/* Soft gradient title overlay on hover */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+              <span className="text-xs font-bold text-white truncate drop-shadow-sm">
+                {p.title}
+              </span>
+            </div>
+          </Link>
         ))}
       </div>
     </section>
@@ -330,12 +374,12 @@ export default function RoomDashboardPage() {
       const membersSnap = await getDocs(collection(db, 'rooms', roomId, 'members'))
       setMembersCount(membersSnap.size || 1)
 
-      // Memories (recent 8 for marquee)
+      // Memories (fetch up to 50 memories for rich random photo pool)
       try {
         const memQ = query(
           collection(db, 'rooms', roomId, 'memories'),
           orderBy('date', 'desc'),
-          limit(8)
+          limit(50)
         )
         const memSnap = await getDocs(memQ)
         setRecentMemories(memSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Memory)))
@@ -343,7 +387,7 @@ export default function RoomDashboardPage() {
         const memSnap = await getDocs(collection(db, 'rooms', roomId, 'memories'))
         const list = memSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Memory))
         list.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-        setRecentMemories(list.slice(0, 8))
+        setRecentMemories(list.slice(0, 50))
       }
 
       // Stories (recent 4)
@@ -382,7 +426,7 @@ export default function RoomDashboardPage() {
   )
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-7">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-7 select-none">
 
       {/* ── Hero Card ── */}
       {loading ? (
@@ -391,12 +435,13 @@ export default function RoomDashboardPage() {
         <HeroCard
           roomName={roomName}
           membersCount={membersCount}
-          memoriesCount={totalPhotos || recentMemories.length}
+          memoriesCount={recentMemories.length}
+          photosCount={totalPhotos}
         />
       )}
 
       {/* ── Quick Access ── */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 select-none">
         {QUICK_CARDS.map(({ label, desc, href, Icon, gradient }) => (
           <Link
             key={label}
