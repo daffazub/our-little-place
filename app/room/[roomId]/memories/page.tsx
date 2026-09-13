@@ -204,18 +204,21 @@ export default function MemoriesPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <ImageIcon className="w-6 h-6 text-[var(--accent-text)]" />
-            Galeri Kenangan
+          <h1
+            className="text-2xl font-bold flex items-center gap-2"
+            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+          >
+            📸 Galeri Kenangan
           </h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             Setiap gambar menyimpan ribuan tawa dan cerita indah kita bersama.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all active:scale-95 shadow-sm shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
+          style={{ background: 'var(--gradient-memory)', color: 'var(--joy-charcoal)' }}
         >
           <Plus className="w-4 h-4" />
           Tambah Kenangan
@@ -224,16 +227,25 @@ export default function MemoriesPage() {
 
       {/* Category Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <Filter className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+        <Filter className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
         {categories.map(cat => (
           <button
             key={cat}
             onClick={() => setFilterCategory(cat)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all"
+            style={
               filterCategory === cat
-                ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm'
-                : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface-elevated)]'
-            }`}
+                ? {
+                    background: 'var(--joy-yellow-light)',
+                    color: 'var(--joy-charcoal)',
+                    boxShadow: '0 1px 4px rgba(255,217,125,0.4)',
+                  }
+                : {
+                    background: 'var(--surface)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                  }
+            }
           >
             {cat === 'all' ? 'Semua Momen' : cat}
           </button>
@@ -248,15 +260,28 @@ export default function MemoriesPage() {
           ))}
         </div>
       ) : filteredMemories.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-3xl space-y-3">
-          <ImageIcon className="w-12 h-12 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Belum ada kenangan di sini</h3>
-          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-            Jadilah yang pertama mengabadikan foto dan momen tak terlupakan bersama teman-teman!
-          </p>
+        <div
+          className="text-center py-16 px-4 border-2 border-dashed rounded-3xl space-y-4"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+        >
+          <div
+            className="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
+            style={{ background: 'var(--joy-yellow-light)' }}
+          >
+            <ImageIcon className="w-9 h-9" style={{ color: 'var(--joy-peach)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Belum ada kenangan di sini
+            </h3>
+            <p className="text-xs mt-1 max-w-xs mx-auto" style={{ color: 'var(--text-muted)' }}>
+              Jadilah yang pertama mengabadikan foto dan momen tak terlupakan bersama teman-teman!
+            </p>
+          </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--gradient-memory)', color: 'var(--joy-charcoal)' }}
           >
             <Plus className="w-4 h-4" /> Tambah Kenangan Sekarang
           </button>
@@ -273,25 +298,32 @@ export default function MemoriesPage() {
             return (
               <div
                 key={m.id}
-                className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group"
+                className="rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group"
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
               >
+                {/* Gradient top strip */}
+                <div className="h-1.5" style={{ background: 'var(--gradient-memory)' }} />
+
                 {/* Photo Display */}
-                <div className="relative aspect-4/3 bg-[var(--surface-elevated)] overflow-hidden">
+                <div className="relative aspect-4/3 overflow-hidden" style={{ background: 'var(--surface-elevated)' }}>
                   {cover ? (
                     <img
                       src={getMediaUrl(cover)}
                       alt={m.title}
-                      className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
-                      <ImageIcon className="w-10 h-10 opacity-40" />
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="w-10 h-10 opacity-30" style={{ color: 'var(--joy-peach)' }} />
                     </div>
                   )}
 
                   {/* Category badge */}
                   {m.category && (
-                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-white text-[10px] font-bold">
+                    <span
+                      className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                      style={{ background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }}
+                    >
                       {m.category}
                     </span>
                   )}
@@ -307,25 +339,28 @@ export default function MemoriesPage() {
                 {/* Card Content */}
                 <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                   <div>
-                    <h3 className="text-sm font-bold text-[var(--text-primary)] leading-snug">
+                    <h3 className="text-sm font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>
                       {m.title}
                     </h3>
                     {m.caption && (
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">
+                      <p className="text-xs mt-1 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                         {m.caption}
                       </p>
                     )}
                   </div>
 
                   {/* Meta info */}
-                  <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+                  <div
+                    className="pt-2 flex items-center justify-between text-[11px]"
+                    style={{ borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                  >
                     <div className="flex items-center gap-3">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         {m.date}
                       </span>
                       {m.location_name && (
-                        <span className="flex items-center gap-1 truncate max-w-[120px]">
+                        <span className="flex items-center gap-1 truncate max-w-[100px]">
                           <MapPin className="w-3.5 h-3.5" />
                           {m.location_name}
                         </span>
@@ -335,14 +370,11 @@ export default function MemoriesPage() {
                     {/* Like button */}
                     <button
                       onClick={() => handleToggleReaction(m.id)}
-                      className={`flex items-center gap-1 p-1 rounded-lg transition-colors ${
-                        hasLiked
-                          ? 'text-[var(--favorite)] font-bold'
-                          : 'text-[var(--text-muted)] hover:text-[var(--favorite)]'
-                      }`}
+                      className="flex items-center gap-1 p-1 rounded-lg transition-colors"
+                      style={{ color: hasLiked ? 'var(--favorite)' : 'var(--text-muted)' }}
                     >
                       <Heart className={`w-4 h-4 ${hasLiked ? 'fill-current' : ''}`} />
-                      {likesCount > 0 && <span>{likesCount}</span>}
+                      {likesCount > 0 && <span className="font-semibold">{likesCount}</span>}
                     </button>
                   </div>
                 </div>

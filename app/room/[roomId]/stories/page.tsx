@@ -96,18 +96,21 @@ export default function StoriesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-[var(--warm)]" />
-            Cerita & Jurnal Bersama
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+          >
+            📖 Cerita &amp; Jurnal Bersama
           </h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             Kisah perjalanan, suka duka, dan surat-surat kecil yang tak ingin kita lupakan.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all active:scale-95 shadow-sm shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
+          style={{ background: 'var(--gradient-story)', color: 'var(--joy-charcoal)' }}
         >
           <Plus className="w-4 h-4" />
           Tulis Cerita Baru
@@ -122,38 +125,58 @@ export default function StoriesPage() {
           ))}
         </div>
       ) : stories.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-3xl space-y-3">
-          <BookOpen className="w-12 h-12 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Belum ada cerita yang ditulis</h3>
-          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-            Setiap momen punya kisahnya sendiri. Mulai tuangkan perasaan atau kisah seru kalian di sini.
-          </p>
+        <div
+          className="text-center py-16 px-4 border-2 border-dashed rounded-3xl space-y-4"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+        >
+          <div
+            className="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
+            style={{ background: 'var(--joy-green-light)' }}
+          >
+            <BookOpen className="w-9 h-9" style={{ color: 'var(--accent)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Belum ada cerita yang ditulis
+            </h3>
+            <p className="text-xs mt-1 max-w-xs mx-auto" style={{ color: 'var(--text-muted)' }}>
+              Setiap momen punya kisahnya sendiri. Mulai tuangkan perasaan atau kisah seru kalian di sini.
+            </p>
+          </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--gradient-story)', color: 'var(--joy-charcoal)' }}
           >
             <Plus className="w-4 h-4" /> Tulis Cerita Pertama
           </button>
         </div>
       ) : (
         <div className="space-y-4">
-          {stories.map(story => (
+          {stories.map((story, index) => (
             <article
               key={story.id}
-              className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm hover:shadow-md transition-shadow space-y-3"
+              className="rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 animate-fade-in-up"
+              style={{
+                background: 'var(--gradient-story)',
+                animationDelay: `${index * 0.07}s`,
+              }}
             >
-              <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+              <div className="flex items-center justify-between text-xs" style={{ color: '#5a7a6a' }}>
                 <span className="flex items-center gap-1.5 font-medium">
                   <Calendar className="w-3.5 h-3.5" />
                   {story.date}
                 </span>
               </div>
 
-              <h2 className="text-lg font-bold text-[var(--text-primary)] leading-snug">
+              <h2
+                className="text-lg font-bold leading-snug"
+                style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+              >
                 {story.title}
               </h2>
 
-              <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line leading-relaxed">
+              <p className="text-sm whitespace-pre-line leading-relaxed" style={{ color: '#4a6358' }}>
                 {story.content}
               </p>
             </article>

@@ -79,22 +79,33 @@ export default function RoomNavbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-[var(--surface)]/90 backdrop-blur-md border-b border-[var(--border)]">
+    <header
+      className="sticky top-0 z-40 backdrop-blur-md border-b"
+      style={{
+        background: 'rgba(255,255,255,0.88)',
+        borderColor: 'var(--border)',
+        boxShadow: '0 1px 12px rgba(168,213,186,0.15)',
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Left: Brand & Room Name */}
         <div className="flex items-center gap-3 min-w-0">
           <Link
             href={`/room/${roomId}`}
-            className="w-10 h-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center shrink-0 shadow-sm"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
+            style={{ background: 'var(--gradient-story)' }}
           >
-            <Sparkles className="w-5 h-5 text-[var(--accent-contrast)]" />
+            <Sparkles className="w-5 h-5" style={{ color: 'var(--joy-charcoal)' }} />
           </Link>
           <div className="truncate">
-            <h1 className="text-base font-bold text-[var(--text-primary)] truncate leading-tight">
+            <h1
+              className="text-base font-bold truncate leading-tight"
+              style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+            >
               {roomName}
             </h1>
-            <p className="text-xs text-[var(--text-muted)] truncate">
-              {session.role === 'owner' ? '👑 Pemilik Room' : 'Sahabat'}
+            <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+              {session.role === 'owner' ? '👑 Pemilik Room' : '🌸 Sahabat'}
             </p>
           </div>
         </div>
@@ -108,11 +119,15 @@ export default function RoomNavbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors ${
+                className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all hover:bg-black/5"
+                style={
                   isActive
-                    ? 'bg-[var(--accent-tint)] text-[var(--accent-text)]'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]'
-                }`}
+                    ? {
+                        background: 'var(--joy-yellow-light)',
+                        color: 'var(--joy-charcoal)',
+                      }
+                    : { color: 'var(--text-secondary)' }
+                }
               >
                 <Icon className="w-4 h-4" />
                 {item.label}

@@ -126,18 +126,21 @@ export default function PlansPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-[var(--success)]" />
-            Agenda & Rencana Mendatang
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+          >
+            📅 Agenda &amp; Rencana
           </h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             Bucket list, jadwal kumpul, dan rencana petualangan kita berikutnya.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all active:scale-95 shadow-sm shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
+          style={{ background: 'var(--gradient-plan)', color: 'var(--joy-charcoal)' }}
         >
           <Plus className="w-4 h-4" />
           Rencana Baru
@@ -145,37 +148,25 @@ export default function PlansPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-            activeTab === 'all'
-              ? 'bg-[var(--accent-tint)] text-[var(--accent-text)]'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]'
-          }`}
-        >
-          Semua ({plans.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('upcoming')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-            activeTab === 'upcoming'
-              ? 'bg-[var(--accent-tint)] text-[var(--accent-text)]'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]'
-          }`}
-        >
-          Akan Datang ({plans.filter(p => p.status === 'upcoming').length})
-        </button>
-        <button
-          onClick={() => setActiveTab('completed')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-            activeTab === 'completed'
-              ? 'bg-[var(--accent-tint)] text-[var(--accent-text)]'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]'
-          }`}
-        >
-          Terlaksana ({plans.filter(p => p.status === 'completed').length})
-        </button>
+      <div className="flex items-center gap-2 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
+        {([
+          { key: 'all', label: `Semua (${plans.length})` },
+          { key: 'upcoming', label: `Akan Datang (${plans.filter(p => p.status === 'upcoming').length})` },
+          { key: 'completed', label: `Terlaksana (${plans.filter(p => p.status === 'completed').length})` },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={
+              activeTab === tab.key
+                ? { background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }
+                : { color: 'var(--text-secondary)' }
+            }
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Plans List */}
@@ -186,15 +177,28 @@ export default function PlansPage() {
           ))}
         </div>
       ) : filteredPlans.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-3xl space-y-3">
-          <Calendar className="w-12 h-12 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Belum ada agenda di sini</h3>
-          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-            Yuk susun rencana jalan-jalan atau kumpul bareng berikutnya!
-          </p>
+        <div
+          className="text-center py-16 px-4 border-2 border-dashed rounded-3xl space-y-4"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+        >
+          <div
+            className="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
+            style={{ background: 'var(--joy-yellow-light)' }}
+          >
+            <Calendar className="w-9 h-9" style={{ color: 'var(--joy-peach)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Belum ada agenda di sini
+            </h3>
+            <p className="text-xs mt-1 max-w-xs mx-auto" style={{ color: 'var(--text-muted)' }}>
+              Yuk susun rencana jalan-jalan atau kumpul bareng berikutnya!
+            </p>
+          </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--gradient-plan)', color: 'var(--joy-charcoal)' }}
           >
             <Plus className="w-4 h-4" /> Buat Rencana
           </button>
@@ -206,48 +210,48 @@ export default function PlansPage() {
             return (
               <div
                 key={plan.id}
-                className={`p-4 rounded-2xl bg-[var(--surface)] border transition-all flex items-start gap-3.5 shadow-sm ${
-                  isDone
-                    ? 'opacity-65 border-[var(--border)] bg-[var(--surface-subtle)]'
-                    : 'border-[var(--border)] hover:border-[var(--accent-border)]'
-                }`}
+                className="rounded-2xl overflow-hidden shadow-sm flex items-start gap-0 transition-all"
+                style={{ border: '1px solid var(--border)', opacity: isDone ? 0.7 : 1 }}
               >
-                {/* Complete toggle button */}
-                <button
-                  onClick={() => handleToggleStatus(plan)}
-                  className={`mt-0.5 transition-colors ${
-                    isDone
-                      ? 'text-[var(--success)]'
-                      : 'text-[var(--text-muted)] hover:text-[var(--success)]'
-                  }`}
-                >
-                  {isDone ? (
-                    <CheckCircle2 className="w-5 h-5 fill-[var(--success-tint)]" />
-                  ) : (
-                    <Circle className="w-5 h-5" />
-                  )}
-                </button>
+                {/* Gradient left strip */}
+                <div
+                  className="w-1.5 shrink-0 self-stretch"
+                  style={{ background: isDone ? 'var(--border)' : 'var(--gradient-plan)' }}
+                />
 
-                {/* Plan Content */}
-                <div className="flex-1 min-w-0 space-y-1">
-                  <h3
-                    className={`text-sm font-bold text-[var(--text-primary)] leading-tight ${
-                      isDone ? 'line-through text-[var(--text-muted)]' : ''
-                    }`}
+                <div className="flex-1 p-4 flex items-start gap-3.5" style={{ background: 'var(--surface)' }}>
+                  {/* Complete toggle button */}
+                  <button
+                    onClick={() => handleToggleStatus(plan)}
+                    className="mt-0.5 transition-colors"
+                    style={{ color: isDone ? 'var(--success)' : 'var(--text-muted)' }}
                   >
-                    {plan.title}
-                  </h3>
-                  {plan.description && (
-                    <p className="text-xs text-[var(--text-secondary)] line-clamp-2">
-                      {plan.description}
-                    </p>
-                  )}
+                    {isDone ? (
+                      <CheckCircle2 className="w-5 h-5 fill-current" />
+                    ) : (
+                      <Circle className="w-5 h-5" />
+                    )}
+                  </button>
 
-                  <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-[var(--text-muted)]">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {plan.date}
-                    </span>
+                  {/* Plan Content */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <h3
+                      className={`text-sm font-bold leading-tight ${isDone ? 'line-through' : ''}`}
+                      style={{ color: isDone ? 'var(--text-muted)' : 'var(--text-primary)' }}
+                    >
+                      {plan.title}
+                    </h3>
+                    {plan.description && (
+                      <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                        {plan.description}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {plan.date}
+                      </span>
                     {plan.time && (
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
@@ -260,6 +264,7 @@ export default function PlansPage() {
                         {plan.location}
                       </span>
                     )}
+                    </div>
                   </div>
                 </div>
               </div>

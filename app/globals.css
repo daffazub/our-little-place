@@ -2,7 +2,8 @@
 
 @theme {
   /* ── Fonts ─────────────────────────────────────── */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-fraunces), var(--font-poppins), Georgia, serif;
 
   /* ── Primary Accent — Deep Teal ────────────────── */
   --color-accent:          #0f766e;
@@ -12,11 +13,15 @@
   --color-accent-border:   #0f766e;
   --color-accent-contrast: #ffffff;
 
-  /* Dark mode accent (set via .dark class) */
-  --color-accent-dark:         #2dd4bf;
-  --color-accent-hover-dark:   #5eead4;
-  --color-accent-text-dark:    #2dd4bf;
-  --color-accent-tint-dark:    rgba(45,212,191,0.15);
+  /* ── Joy Colors — Psikologi Warna Kebahagiaan ───── */
+  --color-joy-yellow:       #FFD97D;
+  --color-joy-yellow-light: #FFE8B3;
+  --color-joy-peach:        #FF8C69;
+  --color-joy-peach-light:  #FFB4A2;
+  --color-joy-green:        #A8D5BA;
+  --color-joy-green-light:  #CDE7D0;
+  --color-joy-blue:         #CFE8F3;
+  --color-joy-charcoal:     #2D2D2D;
 
   /* ── Warm Accent — Muted Gold ──────────────────── */
   --color-warm:       #b45309;
@@ -81,14 +86,31 @@
   --danger-tint: #fee2e2;
   --danger-text: #b91c1c;
 
-  /* Stone neutral */
-  --canvas:           #fafaf9;
-  --surface:          #ffffff;
-  --surface-subtle:   #fafaf9;
-  --surface-elevated: #f5f5f4;
-  --border:           #e7e5e4;
-  --border-strong:    #d6d3d1;
-  --text-primary:     #292524;
+  /* ── Joy Palette ───────────────────────────────── */
+  --joy-yellow:       #FFD97D;
+  --joy-yellow-light: #FFE8B3;
+  --joy-peach:        #FF8C69;
+  --joy-peach-light:  #FFB4A2;
+  --joy-green:        #A8D5BA;
+  --joy-green-light:  #CDE7D0;
+  --joy-blue:         #CFE8F3;
+  --joy-charcoal:     #2D2D2D;
+
+  /* ── Gradient Presets ──────────────────────────── */
+  --gradient-hero:   linear-gradient(135deg, #CFE8F3 0%, #FFFFFF 50%, #CDE7D0 100%);
+  --gradient-memory: linear-gradient(135deg, #FFE8B3 0%, #FFB4A2 100%);
+  --gradient-story:  linear-gradient(135deg, #CDE7D0 0%, #CFE8F3 100%);
+  --gradient-plan:   linear-gradient(135deg, #FFD97D 0%, #FFB4A2 100%);
+  --gradient-date:   linear-gradient(135deg, #FFB4A2 0%, #CFE8F3 100%);
+
+  /* ── White-dominant surface ────────────────────── */
+  --canvas:           #FAFAF8;
+  --surface:          #FFFFFF;
+  --surface-subtle:   #FAFAF8;
+  --surface-elevated: #F5F5F3;
+  --border:           #E8E8E6;
+  --border-strong:    #D4D4D1;
+  --text-primary:     #2D2D2D;
   --text-secondary:   #57534e;
   --text-muted:       #a8a29e;
 }
@@ -117,6 +139,14 @@
   --danger-tint: rgba(248, 113, 113, 0.15);
   --danger-text: #fca5a5;
 
+  --joy-yellow:       #FFD97D;
+  --joy-yellow-light: rgba(255, 217, 125, 0.12);
+  --joy-peach:        #FF8C69;
+  --joy-peach-light:  rgba(255, 140, 105, 0.12);
+  --joy-green:        #A8D5BA;
+  --joy-green-light:  rgba(168, 213, 186, 0.12);
+  --joy-blue:         #CFE8F3;
+
   --canvas:           #0c0a09;
   --surface:          #1c1917;
   --surface-subtle:   #141210;
@@ -126,22 +156,6 @@
   --text-primary:     #fafaf9;
   --text-secondary:   #d6d3d1;
   --text-muted:       #78716c;
-}
-
-/* ── Global resets ────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-
-body {
-  background-color: var(--canvas);
-  color: var(--text-primary);
 }
 
 /* ── Dark mode auto-detection ─────────────────────── */
@@ -169,6 +183,14 @@ body {
     --danger-tint: rgba(248, 113, 113, 0.15);
     --danger-text: #fca5a5;
 
+    --joy-yellow:       #FFD97D;
+    --joy-yellow-light: rgba(255, 217, 125, 0.12);
+    --joy-peach:        #FF8C69;
+    --joy-peach-light:  rgba(255, 140, 105, 0.12);
+    --joy-green:        #A8D5BA;
+    --joy-green-light:  rgba(168, 213, 186, 0.12);
+    --joy-blue:         #CFE8F3;
+
     --canvas:           #0c0a09;
     --surface:          #1c1917;
     --surface-subtle:   #141210;
@@ -179,6 +201,22 @@ body {
     --text-secondary:   #d6d3d1;
     --text-muted:       #78716c;
   }
+}
+
+/* ── Global resets ────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--text-primary);
 }
 
 /* ── Skeleton shimmer animation ───────────────────── */
@@ -228,14 +266,52 @@ body {
 .btn-secondary:hover  { border-color: var(--accent-border); background-color: var(--accent-tint); }
 .btn-secondary:active { transform: scale(0.97); }
 
-/* ── Smooth marquee keyframe ──────────────────────── */
+/* ── Marquee keyframes ────────────────────────────── */
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
 .animate-marquee {
-  animation: marquee 40s linear infinite;
+  animation: marquee 35s linear infinite;
 }
-.animate-marquee:hover {
+.animate-marquee-slow {
+  animation: marquee 55s linear infinite;
+}
+.animate-marquee:hover,
+.animate-marquee-slow:hover {
   animation-play-state: paused;
 }
+
+/* ── Fade-in-up (scroll reveal) ───────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.55s ease-out forwards;
+}
+
+/* ── Gradient card utilities ─────────────────────── */
+.card-gradient-memory {
+  background: var(--gradient-memory);
+  transition: filter 0.3s ease, box-shadow 0.3s ease;
+}
+.card-gradient-memory:hover { filter: brightness(1.04); box-shadow: 0 8px 32px rgba(255,180,162,0.3); }
+
+.card-gradient-story {
+  background: var(--gradient-story);
+  transition: filter 0.3s ease, box-shadow 0.3s ease;
+}
+.card-gradient-story:hover { filter: brightness(1.04); box-shadow: 0 8px 32px rgba(168,213,186,0.3); }
+
+.card-gradient-plan {
+  background: var(--gradient-plan);
+  transition: filter 0.3s ease, box-shadow 0.3s ease;
+}
+.card-gradient-plan:hover { filter: brightness(1.04); box-shadow: 0 8px 32px rgba(255,217,125,0.3); }
+
+.card-gradient-date {
+  background: var(--gradient-date);
+  transition: filter 0.3s ease, box-shadow 0.3s ease;
+}
+.card-gradient-date:hover { filter: brightness(1.04); box-shadow: 0 8px 32px rgba(207,232,243,0.4); }

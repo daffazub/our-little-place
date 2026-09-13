@@ -95,18 +95,21 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <CalendarIcon className="w-6 h-6 text-[var(--accent-text)]" />
-            Kalender & Tanggal Penting
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+          >
+            🎂 Kalender &amp; Tanggal Penting
           </h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             Ulang tahun, anniversary pertemanan, dan hari-hari istimewa yang wajib kita rayakan.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all active:scale-95 shadow-sm shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
+          style={{ background: 'var(--gradient-date)', color: 'var(--joy-charcoal)' }}
         >
           <Plus className="w-4 h-4" />
           Tambah Tanggal Penting
@@ -121,15 +124,28 @@ export default function CalendarPage() {
           ))}
         </div>
       ) : dates.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-3xl space-y-3">
-          <Gift className="w-12 h-12 text-[var(--text-muted)] mx-auto" />
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Belum ada tanggal penting</h3>
-          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-            Catat ulang tahun sahabatmu atau hari jadian pertemanan kalian!
-          </p>
+        <div
+          className="text-center py-16 px-4 border-2 border-dashed rounded-3xl space-y-4"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+        >
+          <div
+            className="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
+            style={{ background: 'var(--joy-peach-light)' }}
+          >
+            <Gift className="w-9 h-9" style={{ color: 'var(--joy-peach)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Belum ada tanggal penting
+            </h3>
+            <p className="text-xs mt-1 max-w-xs mx-auto" style={{ color: 'var(--text-muted)' }}>
+              Catat ulang tahun sahabatmu atau hari jadian pertemanan kalian!
+            </p>
+          </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--gradient-date)', color: 'var(--joy-charcoal)' }}
           >
             <Plus className="w-4 h-4" /> Catat Tanggal Sekarang
           </button>
@@ -139,27 +155,39 @@ export default function CalendarPage() {
           {dates.map(item => (
             <div
               key={item.id}
-              className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-4 shadow-sm flex items-start gap-3.5 hover:border-[var(--accent-border)] transition-all"
+              className="rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex"
+              style={{ border: '1px solid var(--border)' }}
             >
-              <div className="w-10 h-10 rounded-2xl bg-[var(--accent-tint)] text-[var(--accent-text)] flex items-center justify-center shrink-0">
-                <Gift className="w-5 h-5" />
-              </div>
+              {/* Gradient left strip */}
+              <div className="w-1.5 shrink-0" style={{ background: 'var(--gradient-date)' }} />
 
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-[var(--text-primary)] truncate">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  {new Date(item.date).toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                  })}
-                </p>
-                {item.recurring && (
-                  <span className="inline-block mt-2 text-[10px] font-semibold text-[var(--accent-text)] bg-[var(--accent-tint)] px-2 py-0.5 rounded-md">
-                    Berulang Setiap Tahun 🎂
-                  </span>
-                )}
+              <div className="flex-1 p-4 flex items-start gap-3.5" style={{ background: 'var(--surface)' }}>
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: 'var(--joy-peach-light)' }}
+                >
+                  <Gift className="w-5 h-5" style={{ color: 'var(--joy-peach)' }} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {item.title}
+                  </h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {new Date(item.date).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                    })}
+                  </p>
+                  {item.recurring && (
+                    <span
+                      className="inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-md"
+                      style={{ background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }}
+                    >
+                      Berulang Setiap Tahun 🎂
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
