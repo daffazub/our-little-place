@@ -126,7 +126,7 @@ export default function RoomNavbar() {
                         background: 'var(--joy-yellow-light)',
                         color: 'var(--joy-charcoal)',
                       }
-                    : { color: 'var(--text-secondary)' }
+                    : { color: '#57534e' }
                 }
               >
                 <Icon className="w-4 h-4" />

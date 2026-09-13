@@ -42,7 +42,7 @@ export default function BottomNav({ roomId }: BottomNavProps) {
               style={
                 isActive
                   ? { color: 'var(--joy-charcoal)' }
-                  : { color: 'var(--text-muted)' }
+                  : { color: '#78716c' }
               }
             >
               {/* Active indicator dot */}
