@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, User, Home, ArrowRight, AlertCircle } from 'lucide-react'
+import { Sparkles, User, Home, ArrowRight, AlertCircle, Link as LinkIcon, X } from 'lucide-react'
 import { createRoom } from '@/lib/auth'
 import { useSession } from '@/context/SessionContext'
 
@@ -24,6 +24,37 @@ export default function CreateRoomPage() {
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0])
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ roomName?: string; ownerName?: string; general?: string }>({})
+
+  // Join Link Modal State
+  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [pasteLinkInput, setPasteLinkInput] = useState('')
+  const [pasteError, setPasteError] = useState('')
+
+  const handleGoToLink = (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasteError('')
+    const raw = pasteLinkInput.trim()
+    if (!raw) {
+      setPasteError('Silakan masukkan link atau kode undangan.')
+      return
+    }
+
+    const match = raw.match(/\/join\/([^\/\s?#]+)\/([^\/\s?#]+)/)
+    if (match) {
+      router.push(`/join/${match[1]}/${match[2]}`)
+      return
+    }
+
+    const parts = raw.split('/').filter(Boolean)
+    if (parts.length >= 2) {
+      const token = parts[parts.length - 1]
+      const roomId = parts[parts.length - 2]
+      router.push(`/join/${roomId}/${token}`)
+      return
+    }
+
+    setPasteError('Format link tidak dikenali. Pastikan berisi /join/ID_ROOM/TOKEN')
+  }
 
   const validate = () => {
     const newErrors: typeof errors = {}
@@ -177,7 +208,14 @@ export default function CreateRoomPage() {
 
           <p className="text-center text-xs text-[var(--text-muted)]">
             Sudah punya link undangan?{' '}
-            <span className="text-[var(--accent-text)] font-semibold">Buka langsung dari link-nya.</span>
+            <button
+              type="button"
+              onClick={() => setShowJoinModal(true)}
+              className="text-[var(--accent-text)] font-bold underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer inline-flex items-center gap-1"
+            >
+              <LinkIcon className="w-3 h-3" />
+              Buka lewat link undangan
+            </button>
           </p>
         </form>
 
@@ -186,6 +224,82 @@ export default function CreateRoomPage() {
           🔒 Keamanan bergantung pada kerahasiaan invite link. Jangan bagikan di luar lingkaran sahabat.
         </p>
       </div>
+
+      {/* ── Modal Input Link Undangan ── */}
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 border border-[var(--border)] animate-fade-in-up">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-[var(--joy-yellow-light)] flex items-center justify-center text-[var(--joy-peach)]">
+                  <LinkIcon className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-[var(--joy-charcoal)]">
+                  Buka Lewat Link Undangan
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowJoinModal(false)
+                  setPasteError('')
+                }}
+                className="w-8 h-8 rounded-full bg-[var(--surface-elevated)] hover:bg-[var(--border)] text-[var(--text-secondary)] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Jika pasangan atau sahabatmu sudah membagikan link undangan kamar, tempel (paste) link tersebut di bawah ini:
+            </p>
+
+            <form onSubmit={handleGoToLink} className="space-y-3">
+              <div>
+                <input
+                  type="text"
+                  value={pasteLinkInput}
+                  onChange={(e) => {
+                    setPasteLinkInput(e.target.value)
+                    setPasteError('')
+                  }}
+                  placeholder="Contoh: https://our-little-place-drab.vercel.app/join/..."
+                  className={`w-full px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] border text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-all ${
+                    pasteError
+                      ? 'border-[var(--danger)] focus:border-[var(--danger)]'
+                      : 'border-[var(--border)] focus:border-[var(--accent-border)]'
+                  }`}
+                />
+                {pasteError && (
+                  <p className="mt-1.5 text-xs text-[var(--danger-text)] flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {pasteError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowJoinModal(false)
+                    setPasteError('')
+                  }}
+                  className="flex-1 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--border)] transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-97"
+                >
+                  <span>Buka Kamar</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
