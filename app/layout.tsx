@@ -3,6 +3,7 @@ import { Inter, Fraunces, Poppins } from 'next/font/google'
 import './globals.css'
 import { SessionProvider } from '@/context/SessionContext'
 import { AudioProvider } from '@/context/AudioContext'
+import { ToastProvider } from '@/context/ToastContext'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -57,7 +58,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.variable} ${fraunces.variable} ${poppins.variable} font-sans antialiased min-h-dvh bg-[var(--canvas)] text-[var(--text-primary)]`}>
         <SessionProvider>
           <AudioProvider>
-            {children}
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </AudioProvider>
         </SessionProvider>
       </body>

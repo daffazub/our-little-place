@@ -27,11 +27,13 @@ import {
   removeMember,
 } from '@/lib/auth'
 import type { Member, InviteToken } from '@/types/database'
+import { useToast } from '@/context/ToastContext'
 
 export default function SettingsPage() {
   const params = useParams<{ roomId: string }>()
   const router = useRouter()
   const { session, logout, isOwner, refreshSession } = useSession()
+  const toast = useToast()
 
   const [members, setMembers] = useState<Member[]>([])
   const [tokens, setTokens] = useState<InviteToken[]>([])
@@ -127,13 +129,14 @@ export default function SettingsPage() {
   const handleConfirmRemoveMember = async () => {
     if (!memberToRemove || !params.roomId) return
     setRemovingMember(true)
+    const removedName = memberToRemove.name
     try {
       await removeMember(params.roomId, memberToRemove.id)
       setMemberToRemove(null)
       await loadData()
-      setNotice({ text: `${memberToRemove.name} berhasil dikeluarkan dari room.` })
+      toast.success(`${removedName} telah dikeluarkan dari room.`)
     } catch (err) {
-      setNotice({ text: 'Gagal mengeluarkan anggota.', isError: true })
+      toast.error('Gagal mengeluarkan anggota.')
     } finally {
       setRemovingMember(false)
     }
@@ -514,7 +517,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── Modal Konfirmasi Keluarkan Anggota ── */}
+      {/* ── Modal Konfirmasi Keluarkan Anggota (Point 23) ── */}
       {memberToRemove && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
@@ -526,14 +529,14 @@ export default function SettingsPage() {
             className="rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center animate-fade-in-up border"
             style={{
               background: '#FFFFFF',
-              borderColor: 'rgba(238, 90, 82, 0.35)',
+              borderColor: 'rgba(255, 140, 105, 0.35)',
               boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.25)',
             }}
           >
-            {/* Soft Danger Icon */}
+            {/* Friendly Coral Icon */}
             <div
               className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs"
-              style={{ background: 'var(--danger-tint)', color: 'var(--danger)' }}
+              style={{ background: 'rgba(255, 140, 105, 0.12)', color: '#FF8C69' }}
             >
               <UserMinus className="w-7 h-7" />
             </div>
@@ -543,10 +546,10 @@ export default function SettingsPage() {
                 className="text-base font-bold"
                 style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
               >
-                Keluarkan {memberToRemove.name}?
+                Keluarkan {memberToRemove.name} dari room ini?
               </h3>
               <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                Anggota ini akan dihapus dari daftar anggota room. Mereka butuh link undangan baru untuk bisa masuk kembali.
+                {memberToRemove.name} tidak akan bisa mengakses room ini lagi kecuali diundang ulang.
               </p>
             </div>
 
@@ -566,8 +569,8 @@ export default function SettingsPage() {
                 onClick={handleConfirmRemoveMember}
                 className="flex-1 py-2.5 rounded-2xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 shadow-sm cursor-pointer disabled:opacity-50"
                 style={{
-                  background: 'var(--danger)',
-                  boxShadow: '0 4px 14px rgba(238, 90, 82, 0.35)',
+                  background: '#FF8C69',
+                  boxShadow: '0 4px 14px rgba(255, 140, 105, 0.35)',
                 }}
               >
                 {removingMember ? 'Mengeluarkan...' : 'Ya, Keluarkan'}

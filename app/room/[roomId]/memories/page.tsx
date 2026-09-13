@@ -42,6 +42,7 @@ import { uploadPhoto, getMediaUrl } from '@/lib/storage'
 import JoyDatePicker from '@/components/ui/JoyDatePicker'
 import PageHeaderCard from '@/components/ui/PageHeaderCard'
 import CategoryFilterBar from '@/components/ui/CategoryFilterBar'
+import { useToast } from '@/context/ToastContext'
 import type { Memory, PhotoItem } from '@/types/database'
 
 // Kategori warna psikologi kebahagiaan & gradasi card
@@ -86,6 +87,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; dot: string; c
 export default function MemoriesPage() {
   const params = useParams<{ roomId: string }>()
   const { session } = useSession()
+  const toast = useToast()
 
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
@@ -208,6 +210,7 @@ export default function MemoriesPage() {
       const combined = [...prev, ...incoming]
       if (combined.length > 10) {
         setPhotoLimitWarning('Maksimal 10 foto per kenangan ya!')
+        toast.warning('Maksimal 10 foto per kenangan ya! 10 foto pertama tetap kami simpan.')
         setTimeout(() => setPhotoLimitWarning(''), 4000)
         return combined.slice(0, 10)
       }
@@ -228,6 +231,7 @@ export default function MemoriesPage() {
     const maxAllowedNew = 10 - existingPhotos.length
     if (maxAllowedNew <= 0) {
       setPhotoLimitWarning('Sudah mencapai batas maksimal 10 foto. Hapus foto lama terlebih dahulu jika ingin menambah.')
+      toast.warning('Sudah mencapai batas maksimal 10 foto per kenangan.')
       setTimeout(() => setPhotoLimitWarning(''), 4000)
       return
     }
@@ -235,6 +239,7 @@ export default function MemoriesPage() {
       const combined = [...prev, ...incoming]
       if (combined.length > maxAllowedNew) {
         setPhotoLimitWarning('Maksimal 10 foto per kenangan ya!')
+        toast.warning('Maksimal 10 foto per kenangan ya!')
         setTimeout(() => setPhotoLimitWarning(''), 4000)
         return combined.slice(0, maxAllowedNew)
       }

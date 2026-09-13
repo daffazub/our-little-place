@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Users, User, AlertCircle, ArrowRight, ShieldAlert, Smartphone } from 'lucide-react'
-import { joinRoom, validateInviteToken, checkExistingDeviceMember } from '@/lib/auth'
+import { Users, User, AlertCircle, ArrowRight, ShieldAlert, Smartphone, UserCheck, Sparkles } from 'lucide-react'
+import { joinRoom, validateInviteToken, checkExistingDeviceMember, isMemberNameTaken } from '@/lib/auth'
 import { useSession } from '@/context/SessionContext'
 import type { Room, Member } from '@/types/database'
 
@@ -27,6 +27,9 @@ export default function JoinRoomPage() {
   const [memberName, setMemberName] = useState('')
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0])
   const [existingMember, setExistingMember] = useState<Member | null>(null)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([])
+  const [isCheckingName, setIsCheckingName] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; general?: string }>({})
 
@@ -61,6 +64,45 @@ export default function JoinRoomPage() {
     if (params.roomId && params.token) validate()
   }, [params.roomId, params.token])
 
+  // Real-time debounced (500ms) name validation
+  useEffect(() => {
+    const trimmed = memberName.trim()
+    if (!trimmed || trimmed.length < 2) {
+      setNameSuggestions([])
+      return
+    }
+
+    // Don't flag if it's the member's current existing name
+    if (existingMember && trimmed.toLowerCase() === existingMember.name.trim().toLowerCase()) {
+      setErrors(prev => ({ ...prev, name: undefined }))
+      setNameSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setIsCheckingName(true)
+      try {
+        const taken = await isMemberNameTaken(params.roomId, trimmed, existingMember?.id)
+        if (taken) {
+          setErrors(prev => ({
+            ...prev,
+            name: `Nama '${trimmed}' sudah dipakai di room ini, coba nama lain ya 😊`,
+          }))
+          setNameSuggestions([`${trimmed}2`, `${trimmed}_`, `${trimmed} B`, `${trimmed} ✨`])
+        } else {
+          setErrors(prev => ({ ...prev, name: undefined }))
+          setNameSuggestions([])
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsCheckingName(false)
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [memberName, params.roomId, existingMember])
+
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!memberName.trim() || memberName.trim().length < 2) {
@@ -82,6 +124,21 @@ export default function JoinRoomPage() {
       } else {
         setErrors({ general: msg })
       }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Quick direct login for recognized device
+  const handleDirectEnter = async () => {
+    if (!existingMember) return
+    setIsLoading(true)
+    try {
+      const session = await joinRoom(params.roomId, params.token, existingMember.name, existingMember.avatar_url || selectedAvatar)
+      setSession(session)
+      router.push(`/room/${params.roomId}`)
+    } catch (err) {
+      setErrors({ general: err instanceof Error ? err.message : 'Gagal masuk ke room.' })
     } finally {
       setIsLoading(false)
     }
@@ -135,95 +192,226 @@ export default function JoinRoomPage() {
           </p>
         </div>
 
-        <form
-          onSubmit={handleJoin}
-          className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm space-y-5"
-        >
-          {existingMember && (
-            <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-[var(--joy-yellow-light)] border border-[rgba(255,217,125,0.6)] text-[var(--joy-charcoal)] text-xs">
-              <Smartphone className="w-4 h-4 text-[var(--joy-peach)] shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">Perangkat ini sudah terhubung</p>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  Kamu terdaftar di room ini sebagai <span className="font-bold text-[var(--joy-charcoal)]">"{existingMember.name}"</span>. Klik tombol di bawah untuk langsung masuk kembali atau perbarui nama &amp; avatar.
-                </p>
+        {/* ── Case 1: Perangkat Sudah Terhubung (Sapaan Pengenalan Sesi) ── */}
+        {existingMember && !showEditProfile ? (
+          <div
+            className="rounded-3xl border p-7 shadow-xl text-center space-y-5 animate-fade-in-up"
+            style={{
+              background: '#FFFFFF',
+              borderColor: 'rgba(255, 180, 162, 0.45)',
+              boxShadow: '0 16px 40px -10px rgba(255, 180, 162, 0.25), 0 4px 12px rgba(0,0,0,0.03)',
+            }}
+          >
+            {/* Avatar & Dikenali Badge */}
+            <div className="relative inline-block mx-auto">
+              <div
+                className="w-20 h-20 rounded-3xl overflow-hidden border-2 shadow-md mx-auto"
+                style={{ borderColor: 'var(--joy-accent-peach)' }}
+              >
+                {existingMember.avatar_url ? (
+                  <img src={existingMember.avatar_url} alt={existingMember.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-bold text-lg text-[var(--joy-charcoal)] bg-[var(--joy-yellow-light)]">
+                    {existingMember.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-xs border-2 border-white"
+                style={{ background: 'var(--joy-accent-green)', color: '#2d6a4a' }}
+                title="Perangkat Terverifikasi"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
               </div>
             </div>
-          )}
 
-          {errors.general && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {errors.general}
-            </div>
-          )}
-
-          {/* Name */}
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[var(--warm)]" />
-              Nama Kamu <span className="text-[#e05252]">*</span>
-            </label>
-            <input
-              type="text"
-              value={memberName}
-              onChange={e => { setMemberName(e.target.value); setErrors(p => ({ ...p, name: undefined })) }}
-              placeholder="Contoh: Maya, David, Yoga..."
-              className={`w-full px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] border text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-all ${
-                errors.name
-                  ? 'border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
-                  : 'border-[var(--border)] focus:border-[var(--accent-border)]'
-              }`}
-            />
-            {errors.name && (
-              <p className="mt-1.5 text-xs text-[#e05252] flex items-center gap-1.5 font-medium">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {errors.name}
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[var(--joy-yellow-light)] text-[var(--joy-charcoal)] border border-[rgba(255,217,125,0.7)] shadow-2xs">
+                <Sparkles className="w-3 h-3 text-[var(--joy-peach)]" />
+                Perangkat Dikenali
+              </div>
+              <h2
+                className="text-lg font-bold text-[var(--joy-charcoal)]"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                Selamat Datang Kembali!
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                Perangkat ini sudah terhubung ke room sebagai{' '}
+                <span className="font-bold text-[var(--joy-charcoal)]">"{existingMember.name}"</span>.
               </p>
-            )}
-          </div>
+            </div>
 
-          {/* Avatar Picker */}
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
-              Pilih Avatar
-            </label>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              {AVATAR_OPTIONS.map((url) => (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => setSelectedAvatar(url)}
-                  className={`w-12 h-12 rounded-2xl overflow-hidden border-2 transition-all ${
-                    selectedAvatar === url
-                      ? 'border-[var(--accent)] scale-110 shadow-md'
-                      : 'border-transparent hover:border-[var(--border-strong)]'
-                  }`}
-                >
-                  <img src={url} alt="avatar" className="w-full h-full" />
-                </button>
-              ))}
+            {errors.general && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {errors.general}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-3 pt-2">
+              <button
+                type="button"
+                onClick={handleDirectEnter}
+                disabled={isLoading}
+                className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-97 disabled:opacity-60 cursor-pointer shadow-md hover:opacity-95"
+                style={{
+                  background: 'var(--gradient-plan)',
+                  color: 'var(--joy-charcoal)',
+                  boxShadow: '0 6px 20px rgba(255, 180, 162, 0.4)',
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    Menghubungkan...
+                  </>
+                ) : (
+                  <>
+                    Masuk sebagai {existingMember.name}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowEditProfile(true)}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--joy-charcoal)] font-semibold transition-colors underline underline-offset-2 cursor-pointer"
+              >
+                Perbarui nama atau avatar
+              </button>
             </div>
           </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-97 disabled:opacity-60 cursor-pointer shadow-sm"
+        ) : (
+          /* ── Case 2: Form Pendaftaran / Perbarui Profil ── */
+          <form
+            onSubmit={handleJoin}
+            className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm space-y-5 animate-fade-in-up"
           >
-            {isLoading ? (
-              <>
-                <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                {existingMember ? 'Menghubungkan...' : 'Bergabung...'}
-              </>
-            ) : (
-              <>
-                {existingMember ? 'Lanjut Masuk ke Room' : 'Masuk ke Room'}
-                <ArrowRight className="w-4 h-4" />
-              </>
+            {existingMember && (
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                  <Smartphone className="w-4 h-4 text-[var(--joy-peach)]" />
+                  <span>Perbarui profil untuk perangkat ini</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfile(false)}
+                  className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--joy-charcoal)] underline cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
             )}
-          </button>
-        </form>
+
+            {errors.general && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {errors.general}
+              </div>
+            )}
+
+            {/* Name with real-time validation */}
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[var(--warm)]" />
+                  Nama Kamu <span className="text-[var(--joy-error)]">*</span>
+                </span>
+                {isCheckingName && (
+                  <span className="text-[10px] text-[var(--text-muted)] font-normal animate-pulse">
+                    Mengecek ketersediaan...
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={memberName}
+                onChange={e => {
+                  setMemberName(e.target.value)
+                  if (errors.name) setErrors(p => ({ ...p, name: undefined }))
+                }}
+                placeholder="Contoh: Maya, David, Yoga..."
+                className={`w-full px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] border text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-all ${
+                  errors.name
+                    ? 'border-[var(--joy-error)] focus:ring-2 focus:ring-[var(--joy-error)]/20'
+                    : 'border-[var(--border)] focus:border-[var(--accent-border)]'
+                }`}
+              />
+              {errors.name && (
+                <div className="mt-2 space-y-1.5">
+                  <p className="text-xs text-[var(--joy-error)] flex items-center gap-1.5 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {errors.name}
+                  </p>
+                  {/* Suggestion Chips */}
+                  {nameSuggestions.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <span className="text-[10px] text-[var(--text-muted)] font-medium">Saran:</span>
+                      {nameSuggestions.map(sug => (
+                        <button
+                          key={sug}
+                          type="button"
+                          onClick={() => {
+                            setMemberName(sug)
+                            setNameSuggestions([])
+                            setErrors(prev => ({ ...prev, name: undefined }))
+                          }}
+                          className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[var(--joy-yellow-light)] text-[var(--joy-charcoal)] border border-[rgba(255,217,125,0.8)] hover:scale-105 transition-all cursor-pointer shadow-2xs"
+                        >
+                          {sug}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Avatar Picker */}
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+                Pilih Avatar
+              </label>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {AVATAR_OPTIONS.map((url) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setSelectedAvatar(url)}
+                    className={`w-12 h-12 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
+                      selectedAvatar === url
+                        ? 'border-[var(--accent)] scale-110 shadow-md'
+                        : 'border-transparent hover:border-[var(--border-strong)]'
+                    }`}
+                  >
+                    <img src={url} alt="avatar" className="w-full h-full" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading || isCheckingName || !!errors.name}
+              className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-97 disabled:opacity-60 cursor-pointer shadow-sm"
+            >
+              {isLoading ? (
+                <>
+                  <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  {existingMember ? 'Menyimpan...' : 'Bergabung...'}
+                </>
+              ) : (
+                <>
+                  {existingMember ? 'Simpan & Masuk ke Room' : 'Masuk ke Room'}
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         <p className="text-center text-[11px] text-[var(--text-muted)] mt-4 max-w-xs mx-auto leading-relaxed">
           🔒 Link ini bersifat pribadi. Tolong jangan disebar ke luar circle.

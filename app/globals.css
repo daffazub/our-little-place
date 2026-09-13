@@ -86,22 +86,31 @@
   --danger-tint: #fee2e2;
   --danger-text: #b91c1c;
 
-  /* ── Joy Palette ───────────────────────────────── */
-  --joy-yellow:       #FFD97D;
-  --joy-yellow-light: #FFE8B3;
-  --joy-peach:        #FF8C69;
-  --joy-peach-light:  #FFB4A2;
-  --joy-green:        #A8D5BA;
-  --joy-green-light:  #CDE7D0;
-  --joy-blue:         #CFE8F3;
-  --joy-charcoal:     #2D2D2D;
+  /* ── Joy Palette (Official Convention) ─────────── */
+  --joy-base:          #FFFFFF;
+  --joy-accent-blue:   #CFE8F3;
+  --joy-accent-green:  #CDE7D0;
+  --joy-accent-peach:  #FFB4A2;
+  --joy-accent-coral:  #FF8C69;
+  --joy-accent-yellow: #FFD97D;
+  --joy-error:         #e05252;
+
+  /* Aliases for backwards compatibility */
+  --joy-yellow:        var(--joy-accent-yellow);
+  --joy-yellow-light:  #FFE8B3;
+  --joy-peach:         var(--joy-accent-coral);
+  --joy-peach-light:   var(--joy-accent-peach);
+  --joy-green:         #A8D5BA;
+  --joy-green-light:   var(--joy-accent-green);
+  --joy-blue:          var(--joy-accent-blue);
+  --joy-charcoal:      #2D2D2D;
 
   /* ── Gradient Presets ──────────────────────────── */
-  --gradient-hero:   linear-gradient(135deg, #CFE8F3 0%, #FFFFFF 50%, #CDE7D0 100%);
-  --gradient-memory: linear-gradient(135deg, #FFE8B3 0%, #FFB4A2 100%);
-  --gradient-story:  linear-gradient(135deg, #CDE7D0 0%, #CFE8F3 100%);
-  --gradient-plan:   linear-gradient(135deg, #FFD97D 0%, #FFB4A2 100%);
-  --gradient-date:   linear-gradient(135deg, #FFB4A2 0%, #CFE8F3 100%);
+  --gradient-hero:   linear-gradient(135deg, var(--joy-accent-blue) 0%, var(--joy-base) 50%, var(--joy-accent-green) 100%);
+  --gradient-memory: linear-gradient(135deg, var(--joy-yellow-light) 0%, var(--joy-accent-peach) 100%);
+  --gradient-story:  linear-gradient(135deg, var(--joy-accent-green) 0%, var(--joy-accent-blue) 100%);
+  --gradient-plan:   linear-gradient(135deg, var(--joy-accent-yellow) 0%, var(--joy-accent-peach) 100%);
+  --gradient-date:   linear-gradient(135deg, var(--joy-accent-peach) 0%, var(--joy-accent-blue) 100%);
 
   /* ── White-dominant surface ────────────────────── */
   --canvas:           #FAFAF8;
@@ -139,13 +148,21 @@
   --danger-tint: rgba(248, 113, 113, 0.15);
   --danger-text: #fca5a5;
 
-  --joy-yellow:       #FFD97D;
-  --joy-yellow-light: rgba(255, 217, 125, 0.12);
-  --joy-peach:        #FF8C69;
-  --joy-peach-light:  rgba(255, 140, 105, 0.12);
-  --joy-green:        #A8D5BA;
-  --joy-green-light:  rgba(168, 213, 186, 0.12);
-  --joy-blue:         #CFE8F3;
+  --joy-base:          #1c1917;
+  --joy-accent-blue:   #CFE8F3;
+  --joy-accent-green:  #CDE7D0;
+  --joy-accent-peach:  #FFB4A2;
+  --joy-accent-coral:  #FF8C69;
+  --joy-accent-yellow: #FFD97D;
+  --joy-error:         #e05252;
+
+  --joy-yellow:        #FFD97D;
+  --joy-yellow-light:  rgba(255, 217, 125, 0.12);
+  --joy-peach:         #FF8C69;
+  --joy-peach-light:   rgba(255, 140, 105, 0.12);
+  --joy-green:         #A8D5BA;
+  --joy-green-light:   rgba(168, 213, 186, 0.12);
+  --joy-blue:          #CFE8F3;
 
   --canvas:           #0c0a09;
   --surface:          #1c1917;
@@ -175,7 +192,7 @@ body {
   color: var(--text-primary);
 }
 
-/* ── Skeleton shimmer animation ───────────────────── */
+/* ── Warm Pastel Shimmer Skeleton Screen (Point 26) ─ */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -184,13 +201,14 @@ body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--surface-elevated) 25%,
-    var(--border) 50%,
-    var(--surface-elevated) 75%
+    rgba(255, 248, 243, 0.85) 25%,
+    rgba(255, 235, 224, 0.95) 50%,
+    rgba(255, 248, 243, 0.85) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-xl);
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-2xl);
+  border: 1px solid rgba(255, 232, 218, 0.6);
 }
 
 /* ── Button utilities ─────────────────────────────── */
