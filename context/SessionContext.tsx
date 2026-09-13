@@ -26,7 +26,7 @@ interface SessionContextValue {
 const SessionContext = createContext<SessionContextValue | null>(null)
 
 // ─── Provider ─────────────────────────────────────────────────
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [session, setSessionState] = useState<SessionMember | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 

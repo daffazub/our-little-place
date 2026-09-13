@@ -32,7 +32,7 @@ interface AudioContextValue {
 const AudioCtx = createContext<AudioContextValue | null>(null)
 
 // ─── Provider — audio tag never unmounts across page navigations ──
-export function AudioProvider({ children }: { children: ReactNode }) {
+export function AudioProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [queue, setQueueState] = useState<MusicTrack[]>([])
   const [currentIdx, setCurrentIdx] = useState(0)
