@@ -329,3 +329,12 @@ button, a, [role="button"], .cursor-pointer {
 .animate-fade-in-fast {
   animation: fadeInFast 0.2s ease-out forwards;
 }
+
+/* ── Clean Horizontal Scroll & No Scrollbar ───────── */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -40,6 +40,8 @@ import {
 import { db } from '@/lib/firebase/client'
 import { uploadPhoto, getMediaUrl } from '@/lib/storage'
 import JoyDatePicker from '@/components/ui/JoyDatePicker'
+import PageHeaderCard from '@/components/ui/PageHeaderCard'
+import CategoryFilterBar from '@/components/ui/CategoryFilterBar'
 import type { Memory, PhotoItem } from '@/types/database'
 
 // Kategori warna psikologi kebahagiaan & gradasi card
@@ -100,6 +102,8 @@ export default function MemoriesPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('')
   const [formError, setFormError] = useState('')
+  const [addErrors, setAddErrors] = useState<{ title?: string; date?: string; category?: string; photos?: string }>({})
+  const [photoLimitWarning, setPhotoLimitWarning] = useState('')
 
   // Edit state
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null)
@@ -113,6 +117,7 @@ export default function MemoriesPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState('')
+  const [editErrors, setEditErrors] = useState<{ title?: string; date?: string; category?: string; photos?: string }>({})
 
   // Delete state
   const [deletingMemory, setDeletingMemory] = useState<Memory | null>(null)
@@ -195,24 +200,48 @@ export default function MemoriesPage() {
     }
   }
 
-  // File handling for Add
+  // File handling for Add (Maksimal 10 foto)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files)
-      setSelectedFiles(prev => [...prev, ...files])
-    }
+    if (!e.target.files) return
+    const incoming = Array.from(e.target.files)
+    setSelectedFiles(prev => {
+      const combined = [...prev, ...incoming]
+      if (combined.length > 10) {
+        setPhotoLimitWarning('Maksimal 10 foto per kenangan ya!')
+        setTimeout(() => setPhotoLimitWarning(''), 4000)
+        return combined.slice(0, 10)
+      }
+      return combined
+    })
+    setAddErrors(p => ({ ...p, photos: undefined }))
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const removeSelectedFile = (idx: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== idx))
   }
 
-  // File handling for Edit
+  // File handling for Edit (Maksimal 10 foto total)
   const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files)
-      setNewEditFiles(prev => [...prev, ...files])
+    if (!e.target.files) return
+    const incoming = Array.from(e.target.files)
+    const maxAllowedNew = 10 - existingPhotos.length
+    if (maxAllowedNew <= 0) {
+      setPhotoLimitWarning('Sudah mencapai batas maksimal 10 foto. Hapus foto lama terlebih dahulu jika ingin menambah.')
+      setTimeout(() => setPhotoLimitWarning(''), 4000)
+      return
     }
+    setNewEditFiles(prev => {
+      const combined = [...prev, ...incoming]
+      if (combined.length > maxAllowedNew) {
+        setPhotoLimitWarning('Maksimal 10 foto per kenangan ya!')
+        setTimeout(() => setPhotoLimitWarning(''), 4000)
+        return combined.slice(0, maxAllowedNew)
+      }
+      return combined
+    })
+    setEditErrors(p => ({ ...p, photos: undefined }))
+    if (editFileInputRef.current) editFileInputRef.current.value = ''
   }
 
   const removeExistingPhoto = (idx: number) => {
@@ -223,15 +252,23 @@ export default function MemoriesPage() {
     setNewEditFiles(prev => prev.filter((_, i) => i !== idx))
   }
 
-  // Submit Add
+  // Submit Add with full inline validation
   const handleSubmitMemory = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) {
-      setFormError('Judul kenangan wajib diisi.')
+
+    const errs: { title?: string; date?: string; category?: string; photos?: string } = {}
+    if (!title.trim()) errs.title = 'Judul kenangan wajib diisi'
+    if (!date.trim()) errs.date = 'Tanggal kenangan wajib dipilih'
+    if (!category.trim()) errs.category = 'Kategori wajib dipilih'
+    if (selectedFiles.length === 0) errs.photos = 'Minimal unggah 1 foto kenangan'
+
+    if (Object.keys(errs).length > 0) {
+      setAddErrors(errs)
       return
     }
     if (!session || !params.roomId) return
 
+    setAddErrors({})
     setUploading(true)
     setFormError('')
 
@@ -281,6 +318,7 @@ export default function MemoriesPage() {
       setLocationName('')
       setSelectedFiles([])
       setUploadStatus('')
+      setAddErrors({})
       setShowAddModal(false)
       loadMemories()
     } catch (err) {
@@ -302,16 +340,27 @@ export default function MemoriesPage() {
     setExistingPhotos(memory.photos || (memory.memory_photos as PhotoItem[]) || [])
     setNewEditFiles([])
     setEditError('')
+    setEditErrors({})
     setShowConfirmModal(false)
   }
 
-  // Pre-confirm edit click
+  // Pre-confirm edit click with validation
   const handlePreSaveEdit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editTitle.trim()) {
-      setEditError('Judul kenangan tidak boleh kosong.')
+    const errs: { title?: string; date?: string; category?: string; photos?: string } = {}
+    if (!editTitle.trim()) errs.title = 'Judul kenangan wajib diisi'
+    if (!editDate.trim()) errs.date = 'Tanggal kenangan wajib dipilih'
+    if (!editCategory.trim()) errs.category = 'Kategori wajib dipilih'
+    if (existingPhotos.length === 0 && newEditFiles.length === 0) {
+      errs.photos = 'Minimal harus memiliki 1 foto kenangan'
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setEditErrors(errs)
       return
     }
+
+    setEditErrors({})
     setEditError('')
     setShowConfirmModal(true)
   }
@@ -438,76 +487,49 @@ export default function MemoriesPage() {
     }
   }
 
-  const categories = ['all', 'Nongkrong', 'Liburan', 'Kuliner', 'Perayaan', 'Random']
+  const FILTER_ITEMS = [
+    { id: 'all', label: '✨ Semua Momen' },
+    { id: 'Nongkrong', label: '☕ Nongkrong', bg: CATEGORY_STYLES['Nongkrong']?.bg, text: CATEGORY_STYLES['Nongkrong']?.text },
+    { id: 'Liburan', label: '🏖️ Liburan', bg: CATEGORY_STYLES['Liburan']?.bg, text: CATEGORY_STYLES['Liburan']?.text },
+    { id: 'Kuliner', label: '🍕 Kuliner', bg: CATEGORY_STYLES['Kuliner']?.bg, text: CATEGORY_STYLES['Kuliner']?.text },
+    { id: 'Perayaan', label: '🎉 Perayaan', bg: CATEGORY_STYLES['Perayaan']?.bg, text: CATEGORY_STYLES['Perayaan']?.text },
+    { id: 'Random', label: '✨ Random', bg: CATEGORY_STYLES['Random']?.bg, text: CATEGORY_STYLES['Random']?.text },
+  ]
+
   const filteredMemories = filterCategory === 'all'
     ? memories
     : memories.filter(m => m.category === filterCategory)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-7 select-none">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--joy-yellow-light)] text-[var(--joy-charcoal)] mb-2 shadow-2xs border border-[rgba(255,217,125,0.4)]">
-            <Sparkles className="w-3.5 h-3.5 text-[var(--joy-peach)]" />
-            <span>Koleksi Momen Bahagia</span>
-          </div>
-          <h1
-            className="text-2xl sm:text-3xl font-bold flex items-center gap-2"
-            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
-          >
-            📸 Galeri Kenangan Bersama
-          </h1>
-          <p className="text-xs sm:text-sm mt-1 text-[var(--text-secondary)]">
-            Setiap gambar menyimpan ribuan tawa dan cerita indah yang kita lalui bersama.
-          </p>
-        </div>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5 select-none">
+      {/* ── Card 1: Page Header Card (Lega, Spacing 12-16px, Padding 24-28px) ── */}
+      <PageHeaderCard
+        badge={{
+          text: 'Koleksi Momen Bahagia',
+          icon: Sparkles,
+        }}
+        title="📸 Galeri Kenangan Bersama"
+        description="Setiap gambar menyimpan ribuan tawa dan cerita indah yang kita lalui bersama."
+        cta={{
+          label: 'Tambah Kenangan Baru',
+          icon: Plus,
+          onClick: () => {
+            setAddErrors({})
+            setFormError('')
+            setPhotoLimitWarning('')
+            setShowAddModal(true)
+          },
+          gradient: 'var(--gradient-memory)',
+        }}
+      />
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-95 hover:shadow-md cursor-pointer"
-          style={{
-            background: 'var(--gradient-memory)',
-            color: 'var(--joy-charcoal)',
-            boxShadow: '0 4px 16px rgba(255, 180, 162, 0.35)',
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Kenangan Baru
-        </button>
-      </div>
-
-      {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <Filter className="w-4 h-4 shrink-0 text-[var(--text-muted)]" />
-        {categories.map(cat => {
-          const isSelected = filterCategory === cat
-          const catStyle = CATEGORY_STYLES[cat]
-          return (
-            <button
-              key={cat}
-              onClick={() => setFilterCategory(cat)}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-              style={
-                isSelected
-                  ? {
-                      background: catStyle ? catStyle.bg : 'var(--joy-yellow-light)',
-                      color: catStyle ? catStyle.text : 'var(--joy-charcoal)',
-                      boxShadow: '0 2px 8px rgba(255,217,125,0.45)',
-                      fontWeight: 700,
-                    }
-                  : {
-                      background: 'var(--surface)',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border)',
-                    }
-              }
-            >
-              {cat === 'all' ? '✨ Semua Momen' : cat}
-            </button>
-          )
-        })}
-      </div>
+      {/* ── Card 2: Filter Kategori (Scrollable Horizontal di Mobile dengan Fade Kanan) ── */}
+      <CategoryFilterBar
+        categories={FILTER_ITEMS}
+        selectedId={filterCategory}
+        onSelect={(id) => setFilterCategory(id)}
+        label="Filter Momen"
+      />
 
       {/* Memories Grid */}
       {loading ? (
@@ -759,8 +781,9 @@ export default function MemoriesPage() {
             </div>
 
             {formError && (
-              <div className="p-3 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
-                {formError}
+              <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-[#c53030] text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-[#e05252]" />
+                <span>{formError}</span>
               </div>
             )}
 
@@ -768,15 +791,28 @@ export default function MemoriesPage() {
               {/* Judul */}
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Judul Momen *
+                  Judul Momen <span className="text-[#e05252]">*</span>
                 </label>
                 <input
                   type="text"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  onChange={e => {
+                    setTitle(e.target.value)
+                    if (addErrors.title) setAddErrors(p => ({ ...p, title: undefined }))
+                  }}
                   placeholder="Contoh: Liburan ke Dufan, Nonton Konser Bareng"
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all select-text"
+                  className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all select-text ${
+                    addErrors.title
+                      ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
+                      : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40'
+                  }`}
                 />
+                {addErrors.title && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{addErrors.title}</span>
+                  </p>
+                )}
               </div>
 
               {/* Caption */}
@@ -797,20 +833,36 @@ export default function MemoriesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <JoyDatePicker
-                    label="Tanggal"
+                    label="Tanggal *"
                     value={date}
-                    onChange={newDate => setDate(newDate)}
+                    onChange={newDate => {
+                      setDate(newDate)
+                      if (addErrors.date) setAddErrors(p => ({ ...p, date: undefined }))
+                    }}
                   />
+                  {addErrors.date && (
+                    <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{addErrors.date}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                    Kategori
+                    Kategori <span className="text-[#e05252]">*</span>
                   </label>
                   <select
                     value={category}
-                    onChange={e => setCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all cursor-pointer font-medium"
+                    onChange={e => {
+                      setCategory(e.target.value)
+                      if (addErrors.category) setAddErrors(p => ({ ...p, category: undefined }))
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all cursor-pointer font-medium ${
+                      addErrors.category
+                        ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252]'
+                        : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40'
+                    }`}
                   >
                     <option value="Nongkrong">☕ Nongkrong</option>
                     <option value="Liburan">🏖️ Liburan</option>
@@ -818,6 +870,12 @@ export default function MemoriesPage() {
                     <option value="Perayaan">🎉 Perayaan</option>
                     <option value="Random">✨ Random</option>
                   </select>
+                  {addErrors.category && (
+                    <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{addErrors.category}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -835,11 +893,30 @@ export default function MemoriesPage() {
                 />
               </div>
 
-              {/* Upload Foto */}
+              {/* Upload Foto (Maks 10 foto) */}
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Foto Kenangan
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">
+                    Foto Kenangan <span className="text-[#e05252]">*</span>
+                  </label>
+                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                    {selectedFiles.length} / 10 foto dipilih
+                    {selectedFiles.length > 0 && (
+                      <span className="text-[var(--text-muted)] font-normal ml-1">
+                        (≈ {(selectedFiles.length * 35).toFixed(0)} KB WebP)
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                {/* Toast Peringatan Batas Maksimal Foto */}
+                {photoLimitWarning && (
+                  <div className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{photoLimitWarning}</span>
+                  </div>
+                )}
+
                 <input
                   type="file"
                   multiple
@@ -852,14 +929,25 @@ export default function MemoriesPage() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-5 border-2 border-dashed border-[var(--joy-peach)]/60 hover:border-[var(--joy-peach)] rounded-2xl flex flex-col items-center justify-center gap-1.5 text-xs text-[var(--text-secondary)] bg-[var(--joy-yellow-light)]/20 hover:bg-[var(--joy-yellow-light)]/40 transition-all cursor-pointer group"
+                  className={`w-full py-5 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-1.5 text-xs text-[var(--text-secondary)] transition-all cursor-pointer group ${
+                    addErrors.photos
+                      ? 'border-[#e05252] bg-red-50/20'
+                      : 'border-[var(--joy-peach)]/60 hover:border-[var(--joy-peach)] bg-[var(--joy-yellow-light)]/20 hover:bg-[var(--joy-yellow-light)]/40'
+                  }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-[var(--joy-yellow-light)] text-[var(--joy-peach)] flex items-center justify-center group-hover:scale-110 transition-transform">
                     <UploadCloud className="w-5 h-5" />
                   </div>
-                  <span className="font-semibold text-[var(--joy-charcoal)]">Pilih foto dari galeri</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">Mendukung banyak foto sekaligus</span>
+                  <span className="font-semibold text-[var(--joy-charcoal)]">Pilih foto dari galeri (maks 10)</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">Mendukung multi-foto sekaligus</span>
                 </button>
+
+                {addErrors.photos && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{addErrors.photos}</span>
+                  </p>
+                )}
 
                 {selectedFiles.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 mt-3">
@@ -968,8 +1056,9 @@ export default function MemoriesPage() {
             </div>
 
             {editError && (
-              <div className="p-3 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
-                {editError}
+              <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-[#c53030] text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-[#e05252]" />
+                <span>{editError}</span>
               </div>
             )}
 
@@ -977,15 +1066,28 @@ export default function MemoriesPage() {
               {/* Judul */}
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Judul Momen *
+                  Judul Momen <span className="text-[#e05252]">*</span>
                 </label>
                 <input
                   type="text"
                   value={editTitle}
-                  onChange={e => setEditTitle(e.target.value)}
+                  onChange={e => {
+                    setEditTitle(e.target.value)
+                    if (editErrors.title) setEditErrors(p => ({ ...p, title: undefined }))
+                  }}
                   placeholder="Judul kenangan..."
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all select-text"
+                  className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all select-text ${
+                    editErrors.title
+                      ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
+                      : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40'
+                  }`}
                 />
+                {editErrors.title && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{editErrors.title}</span>
+                  </p>
+                )}
               </div>
 
               {/* Catatan / Caption */}
@@ -1006,20 +1108,36 @@ export default function MemoriesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <JoyDatePicker
-                    label="Tanggal"
+                    label="Tanggal *"
                     value={editDate}
-                    onChange={newDate => setEditDate(newDate)}
+                    onChange={newDate => {
+                      setEditDate(newDate)
+                      if (editErrors.date) setEditErrors(p => ({ ...p, date: undefined }))
+                    }}
                   />
+                  {editErrors.date && (
+                    <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{editErrors.date}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                    Kategori
+                    Kategori <span className="text-[#e05252]">*</span>
                   </label>
                   <select
                     value={editCategory}
-                    onChange={e => setEditCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all cursor-pointer font-medium"
+                    onChange={e => {
+                      setEditCategory(e.target.value)
+                      if (editErrors.category) setEditErrors(p => ({ ...p, category: undefined }))
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all cursor-pointer font-medium ${
+                      editErrors.category
+                        ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252]'
+                        : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40'
+                    }`}
                   >
                     <option value="Nongkrong">☕ Nongkrong</option>
                     <option value="Liburan">🏖️ Liburan</option>
@@ -1027,6 +1145,12 @@ export default function MemoriesPage() {
                     <option value="Perayaan">🎉 Perayaan</option>
                     <option value="Random">✨ Random</option>
                   </select>
+                  {editErrors.category && (
+                    <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{editErrors.category}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1044,15 +1168,36 @@ export default function MemoriesPage() {
                 />
               </div>
 
-              {/* Foto yang Sudah Ada */}
+              {/* Foto yang Sudah Ada & Tambah Foto (Maks 10 foto total) */}
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Foto Saat Ini ({existingPhotos.length})
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide">
+                    Foto Kenangan <span className="text-[#e05252]">*</span>
+                  </label>
+                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                    {existingPhotos.length + newEditFiles.length} / 10 foto tersimpan
+                  </span>
+                </div>
+
+                {/* Toast Peringatan Batas Maksimal Foto */}
+                {photoLimitWarning && (
+                  <div className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{photoLimitWarning}</span>
+                  </div>
+                )}
+
+                {editErrors.photos && (
+                  <p className="mb-2 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{editErrors.photos}</span>
+                  </p>
+                )}
+
                 {existingPhotos.length === 0 ? (
-                  <p className="text-xs text-[var(--text-muted)] italic">Tidak ada foto tersimpan.</p>
+                  <p className="text-xs text-[var(--text-muted)] italic mb-2">Tidak ada foto lama tersimpan.</p>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 mb-3">
                     {existingPhotos.map((p, i) => (
                       <div
                         key={p.id || i}
@@ -1080,13 +1225,8 @@ export default function MemoriesPage() {
                     ))}
                   </div>
                 )}
-              </div>
 
-              {/* Tambah Foto Baru */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Tambah Foto Baru
-                </label>
+                {/* Tambah Foto Baru */}
                 <input
                   type="file"
                   multiple
@@ -1102,7 +1242,7 @@ export default function MemoriesPage() {
                   className="w-full py-3.5 border-2 border-dashed border-[var(--joy-peach)]/60 hover:border-[var(--joy-peach)] rounded-2xl flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)] bg-[var(--joy-yellow-light)]/20 hover:bg-[var(--joy-yellow-light)]/40 transition-all cursor-pointer"
                 >
                   <UploadCloud className="w-4 h-4 text-[var(--joy-peach)]" />
-                  <span className="font-semibold text-[var(--joy-charcoal)]">Pilih foto tambahan dari galeri</span>
+                  <span className="font-semibold text-[var(--joy-charcoal)]">Pilih foto tambahan (maks 10 total)</span>
                 </button>
 
                 {newEditFiles.length > 0 && (

@@ -13,6 +13,8 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import JoyDatePicker from '@/components/ui/JoyDatePicker'
+import PageHeaderCard from '@/components/ui/PageHeaderCard'
+import { AlertCircle } from 'lucide-react'
 import type { ImportantDate } from '@/types/database'
 
 export default function CalendarPage() {
@@ -29,6 +31,7 @@ export default function CalendarPage() {
   const [recurring, setRecurring] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [calendarErrors, setCalendarErrors] = useState<{ title?: string; date?: string }>({})
 
   const loadDates = async () => {
     if (!params.roomId) return
@@ -62,14 +65,22 @@ export default function CalendarPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    const errs: { title?: string; date?: string } = {}
     if (!title.trim()) {
-      setError('Nama momen / peringatan wajib diisi.')
+      errs.title = 'Nama momen / peringatan wajib diisi'
+    }
+    if (!date.trim()) {
+      errs.date = 'Tanggal peringatan wajib dipilih'
+    }
+    if (Object.keys(errs).length > 0) {
+      setCalendarErrors(errs)
       return
     }
     if (!session || !params.roomId) return
 
     setSubmitting(true)
     setError('')
+    setCalendarErrors({})
 
     try {
       await addDoc(collection(db, 'rooms', params.roomId, 'important_dates'), {
@@ -93,29 +104,25 @@ export default function CalendarPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
-          >
-            🎂 Kalender &amp; Tanggal Penting
-          </h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            Ulang tahun, anniversary pertemanan, dan hari-hari istimewa yang wajib kita rayakan.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
-          style={{ background: 'var(--gradient-date)', color: 'var(--joy-charcoal)' }}
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Tanggal Penting
-        </button>
-      </div>
+      {/* 2-Card Pattern: Page Header Card */}
+      <PageHeaderCard
+        badge={{
+          text: 'Momen & Hari Spesial',
+          icon: Sparkles,
+        }}
+        title="🎂 Kalender & Tanggal Penting"
+        description="Ulang tahun, anniversary pertemanan, dan hari-hari istimewa yang wajib kita rayakan."
+        cta={{
+          label: 'Tambah Tanggal Penting',
+          icon: Plus,
+          onClick: () => {
+            setCalendarErrors({})
+            setShowAddModal(true)
+          },
+          gradient: 'var(--gradient-date)',
+          textColor: 'var(--joy-charcoal)',
+        }}
+      />
 
       {/* Dates List */}
       {loading ? (
@@ -247,23 +254,45 @@ export default function CalendarPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Nama Peringatan / Acara *
+                  Nama Peringatan / Acara <span className="text-[#e05252]">*</span>
                 </label>
                 <input
                   type="text"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  onChange={e => {
+                    setTitle(e.target.value)
+                    if (calendarErrors.title) setCalendarErrors(prev => ({ ...prev, title: undefined }))
+                  }}
                   placeholder="Contoh: Ulang Tahun Daffa, Hari Jadi Circle"
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all"
+                  className={`w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border text-xs text-[var(--text-primary)] outline-none focus:ring-2 transition-all ${
+                    calendarErrors.title
+                      ? 'border-[#e05252] focus:ring-[#e05252]/20'
+                      : 'border-[var(--border)] focus:border-[var(--joy-peach)] focus:ring-[var(--joy-yellow)]/40'
+                  }`}
                 />
+                {calendarErrors.title && (
+                  <p className="flex items-center gap-1.5 text-xs text-[#e05252] mt-1.5 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {calendarErrors.title}
+                  </p>
+                )}
               </div>
 
               <div>
                 <JoyDatePicker
                   label="Tanggal Peringatan *"
                   value={date}
-                  onChange={newDate => setDate(newDate)}
+                  onChange={newDate => {
+                    setDate(newDate)
+                    if (calendarErrors.date) setCalendarErrors(prev => ({ ...prev, date: undefined }))
+                  }}
                 />
+                {calendarErrors.date && (
+                  <p className="flex items-center gap-1.5 text-xs text-[#e05252] mt-1.5 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {calendarErrors.date}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2.5 pt-1">

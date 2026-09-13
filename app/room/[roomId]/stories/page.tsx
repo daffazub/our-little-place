@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { BookOpen, Plus, Calendar, X, Loader2, Sparkles, Quote } from 'lucide-react'
+import { BookOpen, Plus, Calendar, X, Loader2, Sparkles, Quote, AlertCircle } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
 import {
   collection,
@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import JoyDatePicker from '@/components/ui/JoyDatePicker'
+import PageHeaderCard from '@/components/ui/PageHeaderCard'
 import type { Story } from '@/types/database'
 
 export default function StoriesPage() {
@@ -29,6 +30,7 @@ export default function StoriesPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [storyErrors, setStoryErrors] = useState<{ title?: string; content?: string; date?: string }>({})
 
   const loadStories = async () => {
     if (!params.roomId) return
@@ -62,12 +64,19 @@ export default function StoriesPage() {
 
   const handleCreateStory = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !content.trim()) {
-      setError('Judul dan isi cerita tidak boleh kosong.')
+
+    const errs: { title?: string; content?: string; date?: string } = {}
+    if (!title.trim()) errs.title = 'Judul cerita wajib diisi'
+    if (!content.trim()) errs.content = 'Isi cerita tidak boleh kosong'
+    if (!date.trim()) errs.date = 'Tanggal cerita wajib dipilih'
+
+    if (Object.keys(errs).length > 0) {
+      setStoryErrors(errs)
       return
     }
     if (!session || !params.roomId) return
 
+    setStoryErrors({})
     setSubmitting(true)
     setError('')
 
@@ -83,6 +92,7 @@ export default function StoriesPage() {
 
       setTitle('')
       setContent('')
+      setStoryErrors({})
       setShowAddModal(false)
       loadStories()
     } catch (err) {
@@ -94,29 +104,28 @@ export default function StoriesPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
-          >
-            📖 Cerita &amp; Jurnal Bersama
-          </h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            Kisah perjalanan, suka duka, dan surat-surat kecil yang tak ingin kita lupakan.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
-          style={{ background: 'var(--gradient-story)', color: 'var(--joy-charcoal)' }}
-        >
-          <Plus className="w-4 h-4" />
-          Tulis Cerita Baru
-        </button>
-      </div>
+      {/* ── Page Header Card (Reusable, Spacing 12-16px, Padding 24-28px) ── */}
+      <PageHeaderCard
+        badge={{
+          text: 'Jurnal Hati Sahabat',
+          icon: Sparkles,
+          bg: 'var(--joy-green-light)',
+          textColor: '#1b4d3e',
+          borderColor: 'rgba(168, 213, 186, 0.5)',
+        }}
+        title="📖 Cerita & Jurnal Bersama"
+        description="Kisah perjalanan, suka duka, dan surat-surat kecil yang tak ingin kita lupakan."
+        cta={{
+          label: 'Tulis Cerita Baru',
+          icon: Plus,
+          onClick: () => {
+            setStoryErrors({})
+            setError('')
+            setShowAddModal(true)
+          },
+          gradient: 'var(--gradient-story)',
+        }}
+      />
 
       {/* Stories List */}
       {loading ? (
@@ -234,36 +243,71 @@ export default function StoriesPage() {
             <form onSubmit={handleCreateStory} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Judul Cerita *
+                  Judul Cerita <span className="text-[#e05252]">*</span>
                 </label>
                 <input
                   type="text"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  onChange={e => {
+                    setTitle(e.target.value)
+                    if (storyErrors.title) setStoryErrors(p => ({ ...p, title: undefined }))
+                  }}
                   placeholder="Contoh: Hari Pertama Berkemah di Hutan..."
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-green)] focus:ring-2 focus:ring-[var(--joy-green)]/40 transition-all"
+                  className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all ${
+                    storyErrors.title
+                      ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
+                      : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-green)] focus:ring-2 focus:ring-[var(--joy-green)]/40'
+                  }`}
                 />
+                {storyErrors.title && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{storyErrors.title}</span>
+                  </p>
+                )}
               </div>
 
               <div>
                 <JoyDatePicker
-                  label="Tanggal Cerita"
+                  label="Tanggal Cerita *"
                   value={date}
-                  onChange={newDate => setDate(newDate)}
+                  onChange={newDate => {
+                    setDate(newDate)
+                    if (storyErrors.date) setStoryErrors(p => ({ ...p, date: undefined }))
+                  }}
                 />
+                {storyErrors.date && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{storyErrors.date}</span>
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Isi Cerita *
+                  Isi Cerita <span className="text-[#e05252]">*</span>
                 </label>
                 <textarea
                   value={content}
-                  onChange={e => setContent(e.target.value)}
+                  onChange={e => {
+                    setContent(e.target.value)
+                    if (storyErrors.content) setStoryErrors(p => ({ ...p, content: undefined }))
+                  }}
                   rows={6}
                   placeholder="Tuliskan kisah, perasaan, atau kejadian berharga yang kalian lalui bersama..."
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-green)] focus:ring-2 focus:ring-[var(--joy-green)]/40 transition-all resize-none"
+                  className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all resize-none ${
+                    storyErrors.content
+                      ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
+                      : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-green)] focus:ring-2 focus:ring-[var(--joy-green)]/40'
+                  }`}
                 />
+                {storyErrors.content && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{storyErrors.content}</span>
+                  </p>
+                )}
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2.5">

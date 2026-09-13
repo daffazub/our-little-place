@@ -23,6 +23,7 @@ export default function RoomNavbar() {
   const pathname = usePathname()
   const [copied, setCopied] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   if (!session) return null
 
@@ -174,15 +175,79 @@ export default function RoomNavbar() {
             </div>
 
             <button
-              onClick={() => logout()}
-              title="Keluar"
-              className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors"
+              onClick={() => setShowLogoutModal(true)}
+              title="Keluar dari room"
+              className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[#FF8C69] hover:bg-[#FF8C69]/10 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
+
+      {/* ── Modal Konfirmasi Keluar / Logout ── */}
+      {showLogoutModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowLogoutModal(false)
+          }}
+        >
+          <div
+            className="rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center animate-fade-in-up border"
+            style={{
+              background: '#FFFFFF',
+              borderColor: 'rgba(255, 140, 105, 0.35)',
+              boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            {/* Friendly Peach Icon */}
+            <div
+              className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs"
+              style={{ background: 'rgba(255, 140, 105, 0.12)', color: '#FF8C69' }}
+            >
+              <LogOut className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3
+                className="text-base font-bold"
+                style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+              >
+                Yakin ingin keluar dari room ini?
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                Kamu bisa masuk kembali kapan saja menggunakan tautan undangan.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--border)] border border-[var(--border)] transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutModal(false)
+                  logout()
+                }}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 shadow-sm cursor-pointer"
+                style={{
+                  background: '#FF8C69',
+                  boxShadow: '0 4px 14px rgba(255, 140, 105, 0.35)',
+                }}
+              >
+                Ya, Keluar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

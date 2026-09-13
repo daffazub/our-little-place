@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Calendar, Plus, MapPin, Clock, CheckCircle2, Circle, X, Loader2 } from 'lucide-react'
+import { Calendar, Plus, MapPin, Clock, CheckCircle2, Circle, X, Loader2, Sparkles, AlertCircle } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
 import {
   collection,
@@ -15,6 +15,8 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import JoyDatePicker from '@/components/ui/JoyDatePicker'
+import PageHeaderCard from '@/components/ui/PageHeaderCard'
+import CategoryFilterBar from '@/components/ui/CategoryFilterBar'
 import type { Plan, PlanStatus } from '@/types/database'
 
 export default function PlansPage() {
@@ -34,6 +36,7 @@ export default function PlansPage() {
   const [location, setLocation] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [planErrors, setPlanErrors] = useState<{ title?: string; date?: string }>({})
 
   const loadPlans = async () => {
     if (!params.roomId) return
@@ -84,12 +87,18 @@ export default function PlansPage() {
 
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) {
-      setError('Nama agenda rencana wajib diisi.')
+
+    const errs: { title?: string; date?: string } = {}
+    if (!title.trim()) errs.title = 'Nama agenda rencana wajib diisi'
+    if (!date.trim()) errs.date = 'Tanggal rencana wajib dipilih'
+
+    if (Object.keys(errs).length > 0) {
+      setPlanErrors(errs)
       return
     }
     if (!session || !params.roomId) return
 
+    setPlanErrors({})
     setSubmitting(true)
     setError('')
 
@@ -109,6 +118,7 @@ export default function PlansPage() {
       setTitle('')
       setDescription('')
       setLocation('')
+      setPlanErrors({})
       setShowAddModal(false)
       loadPlans()
     } catch (err) {
@@ -122,53 +132,44 @@ export default function PlansPage() {
     ? plans
     : plans.filter(p => p.status === activeTab)
 
+  const PLAN_FILTER_TABS = [
+    { id: 'all', label: `✨ Semua (${plans.length})` },
+    { id: 'upcoming', label: `⏳ Akan Datang (${plans.filter(p => p.status === 'upcoming').length})` },
+    { id: 'completed', label: `✅ Terlaksana (${plans.filter(p => p.status === 'completed').length})` },
+  ]
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
-          >
-            📅 Agenda &amp; Rencana
-          </h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            Bucket list, jadwal kumpul, dan rencana petualangan kita berikutnya.
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      {/* ── Card 1: Page Header Card (Lega, Spacing 12-16px, Padding 24-28px) ── */}
+      <PageHeaderCard
+        badge={{
+          text: 'Agenda & Bucket List',
+          icon: Sparkles,
+          bg: 'var(--joy-yellow-light)',
+          textColor: '#78350f',
+          borderColor: 'rgba(255, 217, 125, 0.45)',
+        }}
+        title="📅 Agenda & Rencana"
+        description="Bucket list, jadwal kumpul, dan rencana petualangan kita berikutnya."
+        cta={{
+          label: 'Rencana Baru',
+          icon: Plus,
+          onClick: () => {
+            setPlanErrors({})
+            setError('')
+            setShowAddModal(true)
+          },
+          gradient: 'var(--gradient-plan)',
+        }}
+      />
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 hover:opacity-90"
-          style={{ background: 'var(--gradient-plan)', color: 'var(--joy-charcoal)' }}
-        >
-          <Plus className="w-4 h-4" />
-          Rencana Baru
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
-        {([
-          { key: 'all', label: `Semua (${plans.length})` },
-          { key: 'upcoming', label: `Akan Datang (${plans.filter(p => p.status === 'upcoming').length})` },
-          { key: 'completed', label: `Terlaksana (${plans.filter(p => p.status === 'completed').length})` },
-        ] as const).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-            style={
-              activeTab === tab.key
-                ? { background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }
-                : { color: 'var(--text-secondary)' }
-            }
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* ── Card 2: Filter Status Agenda (Scrollable di Mobile) ── */}
+      <CategoryFilterBar
+        categories={PLAN_FILTER_TABS}
+        selectedId={activeTab}
+        onSelect={(id) => setActiveTab(id as any)}
+        label="Status"
+      />
 
       {/* Plans List */}
       {loading ? (
@@ -334,15 +335,28 @@ export default function PlansPage() {
             <form onSubmit={handleCreatePlan} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Nama Rencana / Aktivitas *
+                  Nama Rencana / Aktivitas <span className="text-[#e05252]">*</span>
                 </label>
                 <input
                   type="text"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  onChange={e => {
+                    setTitle(e.target.value)
+                    if (planErrors.title) setPlanErrors(p => ({ ...p, title: undefined }))
+                  }}
                   placeholder="Contoh: Roadtrip ke Jogja, Bukber Bareng"
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all"
+                  className={`w-full px-3.5 py-2.5 rounded-2xl text-xs text-[var(--text-primary)] outline-none transition-all ${
+                    planErrors.title
+                      ? 'bg-red-50/30 border border-[#e05252] focus:border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
+                      : 'bg-[var(--surface-elevated)] border border-[var(--border)] focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40'
+                  }`}
                 />
+                {planErrors.title && (
+                  <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{planErrors.title}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -363,8 +377,17 @@ export default function PlansPage() {
                   <JoyDatePicker
                     label="Tanggal *"
                     value={date}
-                    onChange={newDate => setDate(newDate)}
+                    onChange={newDate => {
+                      setDate(newDate)
+                      if (planErrors.date) setPlanErrors(p => ({ ...p, date: undefined }))
+                    }}
                   />
+                  {planErrors.date && (
+                    <p className="mt-1.5 text-[11px] text-[#e05252] font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{planErrors.date}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
