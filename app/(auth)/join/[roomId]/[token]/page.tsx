@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Users, User, AlertCircle, ArrowRight, ShieldAlert } from 'lucide-react'
-import { joinRoom, validateInviteToken } from '@/lib/auth'
+import { Users, User, AlertCircle, ArrowRight, ShieldAlert, Smartphone } from 'lucide-react'
+import { joinRoom, validateInviteToken, checkExistingDeviceMember } from '@/lib/auth'
 import { useSession } from '@/context/SessionContext'
-import type { Room } from '@/types/database'
+import type { Room, Member } from '@/types/database'
 
 const AVATAR_OPTIONS = [
   'https://api.dicebear.com/7.x/adventurer/svg?seed=Aria&backgroundColor=0f766e',
@@ -26,10 +26,11 @@ export default function JoinRoomPage() {
   const [tokenValid, setTokenValid] = useState(false)
   const [memberName, setMemberName] = useState('')
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0])
+  const [existingMember, setExistingMember] = useState<Member | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; general?: string }>({})
 
-  // Validate token on mount
+  // Validate token & check device member on mount
   useEffect(() => {
     async function validate() {
       setIsValidating(true)
@@ -38,6 +39,16 @@ export default function JoinRoomPage() {
         if (result.valid && result.room) {
           setRoom(result.room)
           setTokenValid(true)
+
+          // Cek apakah perangkat ini sudah terdaftar di room ini
+          const existing = await checkExistingDeviceMember(params.roomId)
+          if (existing) {
+            setExistingMember(existing)
+            setMemberName(existing.name)
+            if (existing.avatar_url) {
+              setSelectedAvatar(existing.avatar_url)
+            }
+          }
         } else {
           setTokenValid(false)
         }
@@ -65,7 +76,12 @@ export default function JoinRoomPage() {
       setSession(session)
       router.push(`/room/${params.roomId}`)
     } catch (err) {
-      setErrors({ general: err instanceof Error ? err.message : 'Gagal bergabung ke room.' })
+      const msg = err instanceof Error ? err.message : 'Gagal bergabung ke room.'
+      if (msg.toLowerCase().includes('sudah digunakan') || msg.toLowerCase().includes('nama')) {
+        setErrors({ name: msg })
+      } else {
+        setErrors({ general: msg })
+      }
     } finally {
       setIsLoading(false)
     }
@@ -123,6 +139,18 @@ export default function JoinRoomPage() {
           onSubmit={handleJoin}
           className="bg-[var(--surface)] rounded-3xl border border-[var(--border)] p-6 shadow-sm space-y-5"
         >
+          {existingMember && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-[var(--joy-yellow-light)] border border-[rgba(255,217,125,0.6)] text-[var(--joy-charcoal)] text-xs">
+              <Smartphone className="w-4 h-4 text-[var(--joy-peach)] shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Perangkat ini sudah terhubung</p>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  Kamu terdaftar di room ini sebagai <span className="font-bold text-[var(--joy-charcoal)]">"{existingMember.name}"</span>. Klik tombol di bawah untuk langsung masuk kembali atau perbarui nama &amp; avatar.
+                </p>
+              </div>
+            </div>
+          )}
+
           {errors.general && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -134,7 +162,7 @@ export default function JoinRoomPage() {
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-[var(--warm)]" />
-              Nama Kamu *
+              Nama Kamu <span className="text-[#e05252]">*</span>
             </label>
             <input
               type="text"
@@ -143,13 +171,13 @@ export default function JoinRoomPage() {
               placeholder="Contoh: Maya, David, Yoga..."
               className={`w-full px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] border text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-all ${
                 errors.name
-                  ? 'border-[var(--danger)]'
+                  ? 'border-[#e05252] focus:ring-2 focus:ring-[#e05252]/20'
                   : 'border-[var(--border)] focus:border-[var(--accent-border)]'
               }`}
             />
             {errors.name && (
-              <p className="mt-1 text-xs text-[var(--danger-text)] flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {errors.name}
+              <p className="mt-1.5 text-xs text-[#e05252] flex items-center gap-1.5 font-medium">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {errors.name}
               </p>
             )}
           </div>
@@ -181,16 +209,16 @@ export default function JoinRoomPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-97 disabled:opacity-60"
+            className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-97 disabled:opacity-60 cursor-pointer shadow-sm"
           >
             {isLoading ? (
               <>
                 <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                Bergabung...
+                {existingMember ? 'Menghubungkan...' : 'Bergabung...'}
               </>
             ) : (
               <>
-                Masuk ke Room
+                {existingMember ? 'Lanjut Masuk ke Room' : 'Masuk ke Room'}
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

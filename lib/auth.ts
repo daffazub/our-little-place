@@ -8,6 +8,7 @@ import {
   setDoc,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -50,6 +51,25 @@ export function getDeviceToken(): string | null {
   return localStorage.getItem(DEVICE_TOKEN_KEY)
 }
 
+// ─── Get or create persistent device token (1 Device Identity) ─
+export function getOrCreateDeviceToken(): string {
+  if (typeof window !== 'undefined') {
+    let token = localStorage.getItem(DEVICE_TOKEN_KEY)
+    if (!token) {
+      const match = document.cookie.match(new RegExp('(^| )olp_device_token=([^;]+)'))
+      if (match && match[2]) {
+        token = match[2]
+      }
+    }
+    if (!token) {
+      token = generateDeviceToken()
+    }
+    saveDeviceToken(token)
+    return token
+  }
+  return generateDeviceToken()
+}
+
 // ─── Save/load full session ────────────────────────────────────
 export function saveSession(session: SessionMember) {
   if (typeof window !== 'undefined') {
@@ -71,14 +91,12 @@ export function loadSession(): SessionMember | null {
 
 export function clearSession() {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem(DEVICE_TOKEN_KEY)
+    // Clear room session but PRESERVE device identity so 1 device = 1 account is maintained
     localStorage.removeItem(SESSION_KEY)
-    const isSecure = window.location.protocol === 'https:'
-    const secureFlag = isSecure ? '; Secure' : ''
-    document.cookie = `olp_device_token=; path=/; max-age=0; SameSite=Lax${secureFlag}`
   }
 }
 
+// ─── Create new room + owner member ───────────────────────────
 // ─── Create new room + owner member ───────────────────────────
 export async function createRoom(
   roomName: string,
@@ -86,8 +104,7 @@ export async function createRoom(
   avatarUrl?: string
 ): Promise<SessionMember> {
   await ensureAnonymousUser()
-  const deviceToken = generateDeviceToken()
-  saveDeviceToken(deviceToken)
+  const deviceToken = getOrCreateDeviceToken()
 
   const now = new Date().toISOString()
 
@@ -102,7 +119,7 @@ export async function createRoom(
   const memberData: Member = {
     id: memberId,
     room_id: roomId,
-    name: ownerName,
+    name: ownerName.trim(),
     avatar_url: avatarUrl ?? null,
     role: 'owner',
     device_token: deviceToken,
@@ -111,7 +128,7 @@ export async function createRoom(
 
   const roomData: Room = {
     id: roomId,
-    name: roomName,
+    name: roomName.trim(),
     owner_id: memberId,
     created_at: now,
   }
@@ -140,6 +157,46 @@ export async function createRoom(
 
   saveSession(session)
   return session
+}
+
+// ─── Check if current device already has a member in room ────
+export async function checkExistingDeviceMember(roomId: string): Promise<Member | null> {
+  try {
+    const deviceToken = getOrCreateDeviceToken()
+    const q = query(
+      collection(db, 'rooms', roomId, 'members'),
+      where('device_token', '==', deviceToken)
+    )
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      const d = snap.docs[0]
+      return { id: d.id, ...d.data() } as Member
+    }
+    return null
+  } catch (err) {
+    console.error('checkExistingDeviceMember error:', err)
+    return null
+  }
+}
+
+// ─── Check if name is already taken in room (case-insensitive) ─
+export async function isMemberNameTaken(
+  roomId: string,
+  targetName: string,
+  excludeMemberId?: string
+): Promise<boolean> {
+  try {
+    const snap = await getDocs(collection(db, 'rooms', roomId, 'members'))
+    const clean = targetName.trim().toLowerCase()
+    return snap.docs.some(d => {
+      if (excludeMemberId && d.id === excludeMemberId) return false
+      const name = ((d.data().name as string) || '').trim().toLowerCase()
+      return name === clean
+    })
+  } catch (err) {
+    console.error('isMemberNameTaken error:', err)
+    return false
+  }
 }
 
 // ─── Validate Invite Token ────────────────────────────────────
@@ -173,7 +230,7 @@ export async function validateInviteToken(
   }
 }
 
-// ─── Join room via invite token ────────────────────────────────
+// ─── Join room via invite token (1 Device = 1 Akun & Nama Unik) ─
 export async function joinRoom(
   roomId: string,
   inviteToken: string,
@@ -181,29 +238,63 @@ export async function joinRoom(
   avatarUrl?: string
 ): Promise<SessionMember> {
   await ensureAnonymousUser()
-  const deviceToken = generateDeviceToken()
-  saveDeviceToken(deviceToken)
+  const deviceToken = getOrCreateDeviceToken()
 
   const validation = await validateInviteToken(roomId, inviteToken)
   if (!validation.valid || !validation.room) {
     throw new Error('Invite link tidak valid atau sudah kadaluarsa.')
   }
 
-  const now = new Date().toISOString()
-  const memberRef = doc(collection(db, 'rooms', roomId, 'members'))
-  const memberId = memberRef.id
-
-  const memberData: Member = {
-    id: memberId,
-    room_id: roomId,
-    name: memberName,
-    avatar_url: avatarUrl ?? null,
-    role: 'contributor',
-    device_token: deviceToken,
-    joined_at: now,
+  const cleanName = memberName.trim()
+  if (!cleanName) {
+    throw new Error('Nama kamu tidak boleh kosong.')
   }
 
-  await setDoc(memberRef, memberData)
+  // 1. Cek apakah device ini sudah pernah bergabung di room ini
+  const existingDeviceMember = await checkExistingDeviceMember(roomId)
+
+  // 2. Validasi Keunikan Nama per Room (Case-Insensitive)
+  const nameTaken = await isMemberNameTaken(roomId, cleanName, existingDeviceMember?.id)
+  if (nameTaken) {
+    throw new Error(`Nama "${cleanName}" sudah digunakan oleh anggota lain di room ini. Silakan gunakan nama/panggilan lain ya!`)
+  }
+
+  const now = new Date().toISOString()
+  let memberData: Member
+
+  if (existingDeviceMember) {
+    // 1 Device = 1 Akun: Perbarui data profil member yang sudah ada pada device ini
+    const memberRef = doc(db, 'rooms', roomId, 'members', existingDeviceMember.id)
+    const updatedFields: Partial<Member> = {
+      name: cleanName,
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+      device_token: deviceToken,
+    }
+    await updateDoc(memberRef, updatedFields)
+
+    memberData = {
+      ...existingDeviceMember,
+      name: cleanName,
+      avatar_url: avatarUrl || existingDeviceMember.avatar_url,
+      device_token: deviceToken,
+    }
+  } else {
+    // Member baru untuk device ini
+    const memberRef = doc(collection(db, 'rooms', roomId, 'members'))
+    const memberId = memberRef.id
+
+    memberData = {
+      id: memberId,
+      room_id: roomId,
+      name: cleanName,
+      avatar_url: avatarUrl ?? null,
+      role: 'contributor',
+      device_token: deviceToken,
+      joined_at: now,
+    }
+
+    await setDoc(memberRef, memberData)
+  }
 
   const session: SessionMember = {
     ...memberData,
@@ -275,3 +366,10 @@ export async function getActiveInviteTokens(roomId: string): Promise<InviteToken
     return []
   }
 }
+
+// ─── Remove member from room (owner action) ───────────────────
+export async function removeMember(roomId: string, memberId: string): Promise<void> {
+  const memberRef = doc(db, 'rooms', roomId, 'members', memberId)
+  await deleteDoc(memberRef)
+}
+

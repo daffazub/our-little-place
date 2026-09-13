@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   AlertCircle,
   RefreshCw,
+  UserMinus,
 } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
 import { doc, updateDoc } from 'firebase/firestore'
@@ -23,6 +24,7 @@ import {
   getActiveInviteTokens,
   generateInviteToken,
   revokeInviteToken,
+  removeMember,
 } from '@/lib/auth'
 import type { Member, InviteToken } from '@/types/database'
 
@@ -39,6 +41,8 @@ export default function SettingsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [notice, setNotice] = useState<{ text: string; isError?: boolean } | null>(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
+  const [removingMember, setRemovingMember] = useState(false)
 
   const loadData = async () => {
     if (!params.roomId) return
@@ -117,6 +121,21 @@ export default function SettingsPage() {
       await navigator.clipboard.writeText(inviteUrl)
       setCopiedTokenId(token.id)
       setTimeout(() => setCopiedTokenId(null), 2500)
+    }
+  }
+
+  const handleConfirmRemoveMember = async () => {
+    if (!memberToRemove || !params.roomId) return
+    setRemovingMember(true)
+    try {
+      await removeMember(params.roomId, memberToRemove.id)
+      setMemberToRemove(null)
+      await loadData()
+      setNotice({ text: `${memberToRemove.name} berhasil dikeluarkan dari room.` })
+    } catch (err) {
+      setNotice({ text: 'Gagal mengeluarkan anggota.', isError: true })
+    } finally {
+      setRemovingMember(false)
     }
   }
 
@@ -272,16 +291,29 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <span
-                    className="px-2.5 py-0.5 rounded-full text-[10px] font-bold"
-                    style={
-                      member.role === 'owner'
-                        ? { background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }
-                        : { background: 'var(--surface-elevated)', color: 'var(--text-secondary)' }
-                    }
-                  >
-                    {member.role === 'owner' ? '👑 Pemilik' : '🌸 Sahabat'}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-bold"
+                      style={
+                        member.role === 'owner'
+                          ? { background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }
+                          : { background: 'var(--surface-elevated)', color: 'var(--text-secondary)' }
+                      }
+                    >
+                      {member.role === 'owner' ? '👑 Pemilik' : '🌸 Sahabat'}
+                    </span>
+
+                    {isOwner && member.role !== 'owner' && (
+                      <button
+                        type="button"
+                        onClick={() => setMemberToRemove(member)}
+                        title={`Keluarkan ${member.name}`}
+                        className="p-1.5 rounded-xl hover:bg-red-50 text-[var(--danger)] transition-colors cursor-pointer"
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -476,6 +508,69 @@ export default function SettingsPage() {
                 }}
               >
                 Ya, Keluar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Konfirmasi Keluarkan Anggota ── */}
+      {memberToRemove && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !removingMember) setMemberToRemove(null)
+          }}
+        >
+          <div
+            className="rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center animate-fade-in-up border"
+            style={{
+              background: '#FFFFFF',
+              borderColor: 'rgba(238, 90, 82, 0.35)',
+              boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            {/* Soft Danger Icon */}
+            <div
+              className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xs"
+              style={{ background: 'var(--danger-tint)', color: 'var(--danger)' }}
+            >
+              <UserMinus className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3
+                className="text-base font-bold"
+                style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+              >
+                Keluarkan {memberToRemove.name}?
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                Anggota ini akan dihapus dari daftar anggota room. Mereka butuh link undangan baru untuk bisa masuk kembali.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={removingMember}
+                onClick={() => setMemberToRemove(null)}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--border)] border border-[var(--border)] transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={removingMember}
+                onClick={handleConfirmRemoveMember}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 shadow-sm cursor-pointer disabled:opacity-50"
+                style={{
+                  background: 'var(--danger)',
+                  boxShadow: '0 4px 14px rgba(238, 90, 82, 0.35)',
+                }}
+              >
+                {removingMember ? 'Mengeluarkan...' : 'Ya, Keluarkan'}
               </button>
             </div>
           </div>
