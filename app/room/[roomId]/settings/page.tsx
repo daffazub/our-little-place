@@ -120,216 +120,287 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-          <Settings className="w-6 h-6 text-[var(--accent-text)]" />
-          Pengaturan & Anggota
+        <h1
+          className="text-2xl font-bold"
+          style={{ color: 'var(--joy-charcoal)', fontFamily: 'var(--font-heading)' }}
+        >
+          ⚙️ Pengaturan &amp; Anggota
         </h1>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
           Kelola nama ruang kenangan, anggota yang terhubung, dan link undangan.
         </p>
       </div>
 
       {notice && (
         <div
-          className={`p-3 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
+          className="p-3 rounded-2xl text-xs font-semibold flex items-center gap-2"
+          style={
             notice.isError
-              ? 'bg-[var(--danger-tint)] text-[var(--danger-text)]'
-              : 'bg-[var(--success-tint)] text-[var(--success-text)]'
-          }`}
+              ? { background: 'var(--danger-tint)', color: 'var(--danger-text)' }
+              : { background: 'var(--joy-green-light)', color: '#2d6a4a' }
+          }
         >
           {notice.isError ? <AlertCircle className="w-4 h-4" /> : <Check className="w-4 h-4" />}
           {notice.text}
         </div>
       )}
 
-      {/* 1. Room Info & Rename (Owner only) */}
-      <section className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-[var(--accent-text)]" />
-          Informasi Tempat Kenangan
-        </h2>
+      {/* 1. Room Info & Rename */}
+      <section
+        className="rounded-3xl overflow-hidden shadow-sm"
+        style={{ border: '1px solid var(--border)' }}
+      >
+        <div className="h-1.5" style={{ background: 'var(--gradient-story)' }} />
+        <div className="p-6 space-y-4" style={{ background: 'var(--surface)' }}>
+          <h2
+            className="text-sm font-bold flex items-center gap-2"
+            style={{ color: 'var(--joy-charcoal)' }}
+          >
+            <ShieldCheck className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+            Informasi Tempat Kenangan
+          </h2>
 
-        {isOwner ? (
-          <form onSubmit={handleUpdateRoomName} className="space-y-3">
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                Nama Ruang Kenangan
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  value={roomName}
-                  onChange={e => setRoomName(e.target.value)}
-                  placeholder="Nama room..."
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
-                />
-                <button
-                  type="submit"
-                  disabled={actionLoading || !roomName.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all disabled:opacity-50"
-                >
-                  Simpan Perubahan
-                </button>
+          {isOwner ? (
+            <form onSubmit={handleUpdateRoomName} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+                  Nama Ruang Kenangan
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={roomName}
+                    onChange={e => setRoomName(e.target.value)}
+                    placeholder="Nama room..."
+                    className="flex-1 px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
+                    style={{
+                      background: 'var(--surface-subtle)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
+                    onFocus={e => (e.target.style.borderColor = 'var(--joy-green)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                  />
+                  <button
+                    type="submit"
+                    disabled={actionLoading || !roomName.trim()}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-50"
+                    style={{ background: 'var(--gradient-story)', color: 'var(--joy-charcoal)' }}
+                  >
+                    Simpan Perubahan
+                  </button>
+                </div>
               </div>
+            </form>
+          ) : (
+            <div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Nama Tempat:</p>
+              <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{roomName}</p>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                (Hanya pembuat room yang dapat mengubah nama tempat).
+              </p>
             </div>
-          </form>
-        ) : (
-          <div>
-            <p className="text-xs text-[var(--text-secondary)]">Nama Tempat:</p>
-            <p className="text-base font-bold text-[var(--text-primary)]">{roomName}</p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">
-              (Hanya pembuat room yang dapat mengubah nama tempat).
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       {/* 2. Anggota Terhubung */}
-      <section className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Users className="w-4 h-4 text-[var(--accent-text)]" />
-            Anggota Terhubung ({members.length})
-          </h2>
-          <button
-            onClick={loadData}
-            title="Muat ulang"
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="space-y-2">
-            <div className="h-14 skeleton rounded-2xl" />
-            <div className="h-14 skeleton rounded-2xl" />
-          </div>
-        ) : (
-          <div className="divide-y divide-[var(--border)]">
-            {members.map(member => (
-              <div key={member.id} className="py-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-2xl overflow-hidden bg-[var(--surface-elevated)] border border-[var(--border)] shrink-0">
-                    {member.avatar_url ? (
-                      <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center font-bold text-xs text-[var(--accent-text)]">
-                        {member.name.slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-[var(--text-primary)] truncate">
-                      {member.name} {member.id === session?.id && '(Kamu)'}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-muted)]">
-                      Bergabung sejak {new Date(member.joined_at).toLocaleDateString('id-ID')}
-                    </p>
-                  </div>
-                </div>
-
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    member.role === 'owner'
-                      ? 'bg-[var(--accent-tint)] text-[var(--accent-text)]'
-                      : 'bg-[var(--surface-elevated)] text-[var(--text-secondary)]'
-                  }`}
-                >
-                  {member.role === 'owner' ? '👑 Pemilik' : 'Sahabat'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* 3. Link Undangan (Invite Tokens) */}
-      <section className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Key className="w-4 h-4 text-[var(--warm)]" />
-            Link Undangan Aktif
-          </h2>
-
-          {isOwner && (
-            <button
-              onClick={handleCreateNewToken}
-              disabled={actionLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all"
+      <section
+        className="rounded-3xl overflow-hidden shadow-sm"
+        style={{ border: '1px solid var(--border)' }}
+      >
+        <div className="h-1.5" style={{ background: 'var(--gradient-memory)' }} />
+        <div className="p-6 space-y-4" style={{ background: 'var(--surface)' }}>
+          <div className="flex items-center justify-between">
+            <h2
+              className="text-sm font-bold flex items-center gap-2"
+              style={{ color: 'var(--joy-charcoal)' }}
             >
-              <Plus className="w-3.5 h-3.5" />
-              Buat Link Baru
+              <Users className="w-4 h-4" style={{ color: 'var(--joy-peach)' }} />
+              Anggota Terhubung ({members.length})
+            </h2>
+            <button
+              onClick={loadData}
+              title="Muat ulang"
+              className="p-1.5 rounded-lg transition-colors hover:bg-black/5"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2">
+              <div className="h-14 skeleton rounded-2xl" />
+              <div className="h-14 skeleton rounded-2xl" />
+            </div>
+          ) : (
+            <div style={{ borderTop: '1px solid var(--border)' }}>
+              {members.map(member => (
+                <div
+                  key={member.id}
+                  className="py-3 flex items-center justify-between gap-3"
+                  style={{ borderBottom: '1px solid var(--surface-elevated)' }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-10 h-10 rounded-2xl overflow-hidden shrink-0"
+                      style={{ background: 'var(--joy-yellow-light)', border: '1px solid var(--border)' }}
+                    >
+                      {member.avatar_url ? (
+                        <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center font-bold text-xs"
+                          style={{ color: 'var(--joy-charcoal)' }}
+                        >
+                          {member.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {member.name} {member.id === session?.id && '(Kamu)'}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        Bergabung sejak {new Date(member.joined_at).toLocaleDateString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className="px-2.5 py-0.5 rounded-full text-[10px] font-bold"
+                    style={
+                      member.role === 'owner'
+                        ? { background: 'var(--joy-yellow-light)', color: 'var(--joy-charcoal)' }
+                        : { background: 'var(--surface-elevated)', color: 'var(--text-secondary)' }
+                    }
+                  >
+                    {member.role === 'owner' ? '👑 Pemilik' : '🌸 Sahabat'}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+      </section>
 
-        <p className="text-xs text-[var(--text-muted)]">
-          Bagikan link ini kepada sahabat yang ingin kamu ajak masuk ke ruang kenangan ini.
-        </p>
+      {/* 3. Link Undangan */}
+      <section
+        className="rounded-3xl overflow-hidden shadow-sm"
+        style={{ border: '1px solid var(--border)' }}
+      >
+        <div className="h-1.5" style={{ background: 'var(--gradient-plan)' }} />
+        <div className="p-6 space-y-4" style={{ background: 'var(--surface)' }}>
+          <div className="flex items-center justify-between">
+            <h2
+              className="text-sm font-bold flex items-center gap-2"
+              style={{ color: 'var(--joy-charcoal)' }}
+            >
+              <Key className="w-4 h-4" style={{ color: 'var(--joy-yellow)' }} />
+              Link Undangan Aktif
+            </h2>
 
-        {tokens.length === 0 ? (
-          <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-dashed border-[var(--border)] text-center text-xs text-[var(--text-muted)]">
-            Tidak ada link undangan aktif saat ini.
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {tokens.map(t => (
-              <div
-                key={t.id}
-                className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            {isOwner && (
+              <button
+                onClick={handleCreateNewToken}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: 'var(--gradient-plan)', color: 'var(--joy-charcoal)' }}
               >
-                <div className="min-w-0">
-                  <p className="text-xs font-mono text-[var(--text-primary)] truncate font-semibold">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/join/${params.roomId}/${t.token}` : t.token}
-                  </p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                    Dibuat {new Date(t.created_at).toLocaleDateString('id-ID')}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleCopyLink(t)}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--accent-border)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
-                  >
-                    {copiedTokenId === t.id ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-[var(--success)]" />
-                        <span className="text-[var(--success-text)]">Tersalin</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Salin Link</span>
-                      </>
-                    )}
-                  </button>
-
-                  {isOwner && (
-                    <button
-                      onClick={() => handleRevokeToken(t.id)}
-                      title="Matikan link ini"
-                      className="p-1.5 rounded-xl text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                <Plus className="w-3.5 h-3.5" />
+                Buat Link Baru
+              </button>
+            )}
           </div>
-        )}
+
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Bagikan link ini kepada sahabat yang ingin kamu ajak masuk ke ruang kenangan ini.
+          </p>
+
+          {tokens.length === 0 ? (
+            <div
+              className="p-4 rounded-2xl border-2 border-dashed text-center text-xs"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'var(--surface-subtle)' }}
+            >
+              Tidak ada link undangan aktif saat ini.
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {tokens.map(t => (
+                <div
+                  key={t.id}
+                  className="p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  style={{ background: 'var(--joy-blue)', border: '1px solid rgba(207,232,243,0.8)' }}
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="text-xs font-mono truncate font-semibold"
+                      style={{ color: 'var(--joy-charcoal)' }}
+                    >
+                      {typeof window !== 'undefined'
+                        ? `${window.location.origin}/join/${params.roomId}/${t.token}`
+                        : t.token}
+                    </p>
+                    <p className="text-[10px] mt-0.5" style={{ color: '#4a7a8a' }}>
+                      Dibuat {new Date(t.created_at).toLocaleDateString('id-ID')}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleCopyLink(t)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      style={{
+                        background: 'rgba(255,255,255,0.7)',
+                        border: '1px solid rgba(207,232,243,0.9)',
+                        color: 'var(--joy-charcoal)',
+                      }}
+                    >
+                      {copiedTokenId === t.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />
+                          <span style={{ color: 'var(--success-text)' }}>Tersalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Salin Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    {isOwner && (
+                      <button
+                        onClick={() => handleRevokeToken(t.id)}
+                        title="Matikan link ini"
+                        className="p-1.5 rounded-xl transition-colors hover:bg-red-100"
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* 4. Keluar dari Room */}
-      <section className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 shadow-sm flex items-center justify-between">
+      <section
+        className="rounded-3xl p-6 shadow-sm flex items-center justify-between"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+      >
         <div>
-          <h3 className="text-sm font-bold text-[var(--danger)]">Keluar dari Ruang Kenangan</h3>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          <h3 className="text-sm font-bold" style={{ color: 'var(--danger)' }}>
+            Keluar dari Ruang Kenangan
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
             Menghapus sesi perangkat ini dari room. Kamu butuh link undangan untuk masuk kembali.
           </p>
         </div>
@@ -339,7 +410,8 @@ export default function SettingsPage() {
             logout()
             router.push('/create')
           }}
-          className="px-4 py-2 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger)] text-xs font-bold hover:bg-[var(--danger)] hover:text-white transition-all flex items-center gap-2 shrink-0"
+          className="px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 hover:opacity-90"
+          style={{ background: 'var(--danger-tint)', color: 'var(--danger)' }}
         >
           <LogOut className="w-4 h-4" />
           Keluar
