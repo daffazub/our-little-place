@@ -55,6 +55,9 @@ Media sosial konvensional saat ini dipenuhi oleh algoritma rekomendasi, iklan ko
   - Owner dapat mencabut (*revoke*) tautan undangan lama kapan saja.
 - **Manajemen Anggota (Kick / Keluarkan Anggota):**
   - Owner memiliki wewenang untuk mengeluarkan anggota tidak dikenal atau akun duplikat langsung dari halaman Pengaturan, disertai dialog konfirmasi keamanan.
+- **Profil Saya & Pengaturan Ruangan:**
+  - Setiap anggota dapat mengubah nama panggilan dan memilih avatar karakter Dicebear langsung di kartu "Profil Saya" pada menu Pengaturan, dengan validasi nama unik otomatis.
+  - Pemilik room dapat memperbarui nama ruang kenangan dengan validasi form client-side.
 - **Peringatan & Modal Konfirmasi Keluar (Logout Confirmation):**
   - Mencegah kehilangan sesi yang tidak disengaja baik dari tombol Logout di Navbar atas maupun kartu *"Keluar dari Ruang Kenangan"* di halaman Pengaturan.
   - Menampilkan modal dialog lembut dengan tombol "Batal" dan "Ya, Keluar" (`#FF8C69`).
