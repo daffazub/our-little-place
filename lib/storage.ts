@@ -22,7 +22,7 @@ export interface UploadResult {
   downloadUrl: string
 }
 
-// ─── Photo upload with auto-compression ───────────────────────
+// ─── Photo upload with fast compression ───────────────────────
 export async function uploadPhoto(
   file: File,
   roomId: string,
@@ -30,15 +30,28 @@ export async function uploadPhoto(
 ): Promise<UploadResult> {
   let fileToUpload = file
 
-  if (file.type.startsWith('image/')) {
+  // If image is already smaller than 1.2MB (e.g. WhatsApp photos), upload directly without waiting for compression
+  if (file.type.startsWith('image/') && file.size > 1.2 * 1024 * 1024) {
     try {
-      fileToUpload = await imageCompression(file, COMPRESSION_OPTIONS)
+      const compressionPromise = imageCompression(file, {
+        maxSizeMB: 0.8,
+        maxWidthOrHeight: 1400,
+        useWebWorker: false,
+        initialQuality: 0.85,
+      })
+
+      // Timeout fallback 3.5 seconds so user is never stuck
+      const timeoutPromise = new Promise<File>((resolve) =>
+        setTimeout(() => resolve(file), 3500)
+      )
+
+      fileToUpload = await Promise.race([compressionPromise, timeoutPromise])
     } catch {
       fileToUpload = file
     }
   }
 
-  const ext = fileToUpload.type === 'image/webp' ? 'webp' : file.name.split('.').pop() ?? 'jpg'
+  const ext = fileToUpload.name.split('.').pop() ?? 'jpg'
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const storagePath = `rooms/${roomId}/memories/${memoryId}/${fileName}`
   const storageRef = ref(storage, storagePath)

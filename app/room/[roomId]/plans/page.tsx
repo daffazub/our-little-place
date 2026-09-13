@@ -14,6 +14,7 @@ import {
   orderBy,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
+import JoyDatePicker from '@/components/ui/JoyDatePicker'
 import type { Plan, PlanStatus } from '@/types/database'
 
 export default function PlansPage() {
@@ -204,66 +205,80 @@ export default function PlansPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {filteredPlans.map(plan => {
             const isDone = plan.status === 'completed'
             return (
               <div
                 key={plan.id}
-                className="rounded-2xl overflow-hidden shadow-sm flex items-start gap-0 transition-all"
-                style={{ border: '1px solid var(--border)', opacity: isDone ? 0.7 : 1 }}
+                className="group rounded-3xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5 flex items-stretch shadow-xs"
+                style={{
+                  background: isDone
+                    ? 'rgba(250, 250, 248, 0.7)'
+                    : 'linear-gradient(180deg, #FFFFFF 0%, #FFFDF9 100%)',
+                  border: isDone
+                    ? '1.5px solid rgba(232, 232, 230, 0.8)'
+                    : '1.5px solid rgba(255, 217, 125, 0.45)',
+                  boxShadow: isDone
+                    ? 'none'
+                    : '0 6px 20px -4px rgba(255, 217, 125, 0.2)',
+                  opacity: isDone ? 0.75 : 1,
+                }}
               >
-                {/* Gradient left strip */}
+                {/* Gradient left accent bar */}
                 <div
-                  className="w-1.5 shrink-0 self-stretch"
-                  style={{ background: isDone ? 'var(--border)' : 'var(--gradient-plan)' }}
+                  className="w-2 shrink-0 self-stretch"
+                  style={{
+                    background: isDone
+                      ? 'var(--border)'
+                      : 'var(--gradient-plan)',
+                  }}
                 />
 
-                <div className="flex-1 p-4 flex items-start gap-3.5" style={{ background: 'var(--surface)' }}>
+                <div className="flex-1 p-4 sm:p-5 flex items-start gap-4">
                   {/* Complete toggle button */}
                   <button
                     onClick={() => handleToggleStatus(plan)}
-                    className="mt-0.5 transition-colors"
-                    style={{ color: isDone ? 'var(--success)' : 'var(--text-muted)' }}
+                    className="mt-0.5 transition-transform active:scale-90 cursor-pointer shrink-0"
+                    style={{ color: isDone ? 'var(--success)' : 'var(--joy-yellow)' }}
                   >
                     {isDone ? (
-                      <CheckCircle2 className="w-5 h-5 fill-current" />
+                      <CheckCircle2 className="w-5 h-5 text-[var(--success)] fill-[var(--success-tint)]" />
                     ) : (
-                      <Circle className="w-5 h-5" />
+                      <Circle className="w-5 h-5 text-[var(--joy-peach)] hover:scale-110 transition-transform" />
                     )}
                   </button>
 
                   {/* Plan Content */}
-                  <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex-1 min-w-0 space-y-1.5">
                     <h3
-                      className={`text-sm font-bold leading-tight ${isDone ? 'line-through' : ''}`}
-                      style={{ color: isDone ? 'var(--text-muted)' : 'var(--text-primary)' }}
+                      className={`text-sm font-bold leading-tight ${isDone ? 'line-through text-[var(--text-muted)]' : 'text-[var(--joy-charcoal)]'}`}
                     >
                       {plan.title}
                     </h3>
                     {plan.description && (
-                      <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                      <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
                         {plan.description}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                      <span className="inline-flex items-center gap-1 font-medium px-2.5 py-0.5 rounded-full bg-[var(--joy-yellow-light)] text-[var(--joy-charcoal)]">
+                        <Calendar className="w-3.5 h-3.5 text-[var(--joy-peach)]" />
                         {plan.date}
                       </span>
-                    {plan.time && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {plan.time}
-                      </span>
-                    )}
-                    {plan.location && (
-                      <span className="flex items-center gap-1 truncate max-w-[150px]">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {plan.location}
-                      </span>
-                    )}
+                      {plan.time && (
+                        <span className="inline-flex items-center gap-1 font-medium px-2.5 py-0.5 rounded-full bg-[var(--joy-green-light)] text-[#1b4d3e]">
+                          <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
+                          {plan.time}
+                        </span>
+                      )}
+                      {plan.location && (
+                        <span className="inline-flex items-center gap-1 font-medium px-2.5 py-0.5 rounded-full bg-[var(--joy-blue)] text-[#075985] truncate max-w-[170px]">
+                          <MapPin className="w-3.5 h-3.5 text-[#0284c7]" />
+                          {plan.location}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -276,81 +291,97 @@ export default function PlansPage() {
       {/* Modal Buat Rencana */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[var(--success)]" />
-                Buat Rencana Baru
-              </h2>
+          <div
+            className="rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            style={{
+              background: '#FFFFFF',
+              border: '1.5px solid rgba(255, 217, 125, 0.6)',
+              boxShadow: '0 20px 50px -10px rgba(255, 217, 125, 0.35)',
+            }}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs"
+                  style={{ background: 'var(--gradient-plan)' }}
+                >
+                  <Calendar className="w-5 h-5 text-[var(--joy-charcoal)]" />
+                </div>
+                <div>
+                  <h2
+                    className="text-base font-bold leading-tight text-[var(--joy-charcoal)]"
+                    style={{ fontFamily: 'var(--font-heading)' }}
+                  >
+                    Buat Rencana Baru
+                  </h2>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Agendakan momen seru berikutnya bersama</p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]"
+                className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {error && (
-              <div className="p-3 rounded-xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
+              <div className="p-3 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleCreatePlan} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                  Nama Agenda *
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Nama Rencana / Aktivitas *
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  placeholder="Contoh: Barbeque Malam Tahun Baru"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
+                  placeholder="Contoh: Roadtrip ke Jogja, Bukber Bareng"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                  Deskripsi Singkat
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+                  Catatan / Deskripsi
                 </label>
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   rows={3}
                   placeholder="Detail rencana, apa yang perlu dibawa, dll..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)] resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                    Tanggal *
-                  </label>
-                  <input
-                    type="date"
+                  <JoyDatePicker
+                    label="Tanggal *"
                     value={date}
-                    onChange={e => setDate(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
+                    onChange={newDate => setDate(newDate)}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
+                  <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                     Waktu / Jam
                   </label>
                   <input
                     type="time"
                     value={time}
                     onChange={e => setTime(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Lokasi / Tempat
                 </label>
                 <input
@@ -358,26 +389,31 @@ export default function PlansPage() {
                   value={location}
                   onChange={e => setLocation(e.target.value)}
                   placeholder="Contoh: Rooftop Rumah Daffa / Puncak"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-peach)] focus:ring-2 focus:ring-[var(--joy-yellow)]/40 transition-all"
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] transition-colors"
+                  className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all flex items-center gap-2 disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-60 cursor-pointer hover:opacity-95 shadow-sm"
+                  style={{
+                    background: 'var(--gradient-plan)',
+                    color: 'var(--joy-charcoal)',
+                    boxShadow: '0 4px 14px rgba(255, 217, 125, 0.4)',
+                  }}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Menyimpan...
                     </>
                   ) : (

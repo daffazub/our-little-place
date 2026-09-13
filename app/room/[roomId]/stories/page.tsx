@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { BookOpen, Plus, Calendar, X, Loader2 } from 'lucide-react'
+import { BookOpen, Plus, Calendar, X, Loader2, Sparkles, Quote } from 'lucide-react'
 import { useSession } from '@/context/SessionContext'
 import {
   collection,
@@ -12,6 +12,7 @@ import {
   orderBy,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
+import JoyDatePicker from '@/components/ui/JoyDatePicker'
 import type { Story } from '@/types/database'
 
 export default function StoriesPage() {
@@ -156,17 +157,20 @@ export default function StoriesPage() {
           {stories.map((story, index) => (
             <article
               key={story.id}
-              className="rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 animate-fade-in-up"
+              className="group rounded-3xl p-6 transition-all duration-300 hover:-translate-y-0.5 space-y-3 animate-fade-in-up relative overflow-hidden"
               style={{
-                background: 'var(--gradient-story)',
+                background: 'linear-gradient(135deg, rgba(205, 231, 208, 0.45) 0%, rgba(207, 232, 243, 0.5) 100%)',
+                border: '1.5px solid rgba(168, 213, 186, 0.6)',
+                boxShadow: '0 8px 24px -4px rgba(168, 213, 186, 0.25), 0 2px 6px rgba(0,0,0,0.02)',
                 animationDelay: `${index * 0.07}s`,
               }}
             >
-              <div className="flex items-center justify-between text-xs" style={{ color: '#5a7a6a' }}>
-                <span className="flex items-center gap-1.5 font-medium">
-                  <Calendar className="w-3.5 h-3.5" />
+              <div className="flex items-center justify-between text-xs">
+                <span className="inline-flex items-center gap-1.5 font-semibold px-3 py-1 rounded-full bg-white/70 text-[#2d6a4a] shadow-xs">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--joy-green)]" />
                   {story.date}
                 </span>
+                <Quote className="w-5 h-5 text-[#2d6a4a]/30 group-hover:text-[#2d6a4a]/60 transition-colors" />
               </div>
 
               <h2
@@ -176,7 +180,7 @@ export default function StoriesPage() {
                 {story.title}
               </h2>
 
-              <p className="text-sm whitespace-pre-line leading-relaxed" style={{ color: '#4a6358' }}>
+              <p className="text-sm whitespace-pre-line leading-relaxed text-[#374151]">
                 {story.content}
               </p>
             </article>
@@ -187,29 +191,49 @@ export default function StoriesPage() {
       {/* Modal Tulis Cerita */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[var(--warm)]" />
-                Tulis Cerita Baru
-              </h2>
+          <div
+            className="rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            style={{
+              background: '#FFFFFF',
+              border: '1.5px solid rgba(168, 213, 186, 0.6)',
+              boxShadow: '0 20px 50px -10px rgba(168, 213, 186, 0.35)',
+            }}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs"
+                  style={{ background: 'var(--gradient-story)' }}
+                >
+                  <BookOpen className="w-5 h-5 text-[var(--joy-charcoal)]" />
+                </div>
+                <div>
+                  <h2
+                    className="text-base font-bold leading-tight text-[var(--joy-charcoal)]"
+                    style={{ fontFamily: 'var(--font-heading)' }}
+                  >
+                    Tulis Cerita Baru
+                  </h2>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Ungkapkan rasa dan kisah perjalanan bersama</p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]"
+                className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {error && (
-              <div className="p-3 rounded-xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
+              <div className="p-3 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger-text)] text-xs font-semibold">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleCreateStory} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Judul Cerita *
                 </label>
                 <input
@@ -217,24 +241,20 @@ export default function StoriesPage() {
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Contoh: Hari Pertama Berkemah di Hutan..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-green)] focus:ring-2 focus:ring-[var(--joy-green)]/40 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
-                  Tanggal
-                </label>
-                <input
-                  type="date"
+                <JoyDatePicker
+                  label="Tanggal Cerita"
                   value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)]"
+                  onChange={newDate => setDate(newDate)}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 uppercase tracking-wide">
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Isi Cerita *
                 </label>
                 <textarea
@@ -242,26 +262,31 @@ export default function StoriesPage() {
                   onChange={e => setContent(e.target.value)}
                   rows={6}
                   placeholder="Tuliskan kisah, perasaan, atau kejadian berharga yang kalian lalui bersama..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-border)] resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--joy-green)] focus:ring-2 focus:ring-[var(--joy-green)]/40 transition-all resize-none"
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] transition-colors"
+                  className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold hover:bg-[var(--accent-hover)] transition-all flex items-center gap-2 disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-60 cursor-pointer hover:opacity-95 shadow-sm"
+                  style={{
+                    background: 'var(--gradient-story)',
+                    color: 'var(--joy-charcoal)',
+                    boxShadow: '0 4px 14px rgba(168, 213, 186, 0.35)',
+                  }}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Menyimpan...
                     </>
                   ) : (
