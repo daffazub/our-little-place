@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ── Fungsi Helper Validasi ──────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // ── Koleksi Ruangan (/rooms/{roomId}) ───────────────────────────
+    match /rooms/{roomId} {
+      // Membaca room: diizinkan bagi pengguna terautentikasi (Anonymous/User) untuk validasi room & link join
+      allow read: if isSignedIn();
+      
+      // Membuat room baru: wajib menyertakan nama room valid (2-50 karakter) & owner_id
+      allow create: if isSignedIn() 
+        && isValidString(request.resource.data.name, 2, 50)
+        && request.resource.data.owner_id is string;
+      
+      // Update metadata room: hanya nama room (2-50 karakter)
+      allow update: if isSignedIn()
+        && isValidString(request.resource.data.name, 2, 50);
+      
+      // Hapus room dilarang dari klien demi mencegah kehilangan data massal
+      allow delete: if false;
+
+      // ── Subkoleksi: Anggota (/rooms/{roomId}/members/{memberId}) ──
+      match /members/{memberId} {
+        allow read: if isSignedIn();
+        // Nama 2-30 karakter, role 'owner' atau 'contributor', device_token wajib terisi
+        allow create: if isSignedIn()
+          && isValidString(request.resource.data.name, 2, 30)
+          && request.resource.data.role in ['owner', 'contributor']
+          && request.resource.data.device_token is string;
+        allow update: if isSignedIn()
+          && isValidString(request.resource.data.name, 2, 30);
+        allow delete: if isSignedIn();
+      }
+
+      // ── Subkoleksi: Kunci Nama Unik Atomik (/rooms/{roomId}/usernames/{nameLower}) ──
+      match /usernames/{nameLower} {
+        allow read: if isSignedIn();
+        // Hanya bisa dibuat jika dokumen kunci ini BELUM ada sebelumnya
+        allow create: if isSignedIn() && !exists(/databases/$(database)/documents/rooms/$(roomId)/usernames/$(nameLower));
+        allow delete: if isSignedIn();
+      }
+
+      // ── Subkoleksi: Galeri Kenangan (/rooms/{roomId}/memories/{memoryId}) ──
+      match /memories/{memoryId} {
+        allow read: if isSignedIn();
+        // Judul 1-100 karakter, dibatasi MAKSIMAL 10 foto per momen (ditegakkan di rules!)
+        allow create: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && request.resource.data.photos is list
+          && request.resource.data.photos.size() <= 10;
+        allow update: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && (!('photos' in request.resource.data) || request.resource.data.photos.size() <= 10);
+        allow delete: if isSignedIn();
+      }
+
+      // ── Subkoleksi: Cerita & Jurnal (/rooms/{roomId}/stories/{storyId}) ──
+      match /stories/{storyId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && isValidString(request.resource.data.content, 1, 10000);
+        allow update: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && isValidString(request.resource.data.content, 1, 10000);
+        allow delete: if isSignedIn();
+      }
+
+      // ── Subkoleksi: Agenda & Rencana (/rooms/{roomId}/plans/{planId}) ──
+      match /plans/{planId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && request.resource.data.status in ['upcoming', 'completed'];
+        allow update: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && request.resource.data.status in ['upcoming', 'completed'];
+        allow delete: if isSignedIn();
+      }
+
+      // ── Subkoleksi: Kalender (/rooms/{roomId}/important_dates/{dateId}) ──
+      match /important_dates/{dateId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100)
+          && request.resource.data.date is string;
+        allow update: if isSignedIn()
+          && isValidString(request.resource.data.title, 1, 100);
+        allow delete: if isSignedIn();
+      }
+
+      // ── Subkoleksi: Token Undangan (/rooms/{roomId}/invite_tokens/{tokenId}) ──
+      match /invite_tokens/{tokenId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && isValidString(request.resource.data.token, 16, 64);
+        allow update: if isSignedIn()
+          && request.resource.data.revoked == true;
+        allow delete: if isSignedIn();
+      }
+    }
+  }
+}

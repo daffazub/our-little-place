@@ -1,0 +1,23 @@
+{
+  "scanned": "2026-11-08",
+  "findings": {
+    "fonts": "Fraunces and Figtree via next/font/google before redesign",
+    "palette": "Warm paper and clay custom properties in app/globals.css before redesign",
+    "motion": "Framer Motion plus CSS transitions and marquee utilities",
+    "spacing": "Tailwind utility scale with rounded card-heavy surfaces",
+    "framework": "Next.js App Router, React 19, TypeScript"
+  },
+  "preserve": [
+    "All routes and Firebase wiring",
+    "Firestore queries and Storage operations",
+    "Forms, fields, handlers, links, ids, and test hooks",
+    "Session, audio, toast, and invite flows"
+  ],
+  "introduce": [
+    "Almanac editorial app system",
+    "Slate paper, blue-black ink, and restrained magenta signal",
+    "Square rule-led surfaces instead of rounded card stacks",
+    "Hanken Grotesk, Newsreader, and IBM Plex Mono type roles",
+    "Hallmark Floor tokens, focus, reduced motion, and app states"
+  ]
+}

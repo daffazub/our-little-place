@@ -1,0 +1,16 @@
+{
+  "name": "Our Little Place",
+  "short_name": "Our Little Place",
+  "description": "Ruang kenangan bersama orang-orang tersayang.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF6EE",
+  "theme_color": "#FBF6EE",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

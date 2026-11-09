@@ -1,0 +1,15 @@
+[
+  {
+    "mode": "redesign",
+    "depth": "full",
+    "scope": "app",
+    "theme": "Almanac",
+    "genre": "editorial",
+    "job": "create or return to a private room and preserve shared memories",
+    "signature": "the room archive, presented as a living record",
+    "kept": ["routes", "Firebase wiring", "forms", "handlers", "fields", "links", "test hooks"],
+    "changed": ["tokens", "type system", "surface ladder", "landing entry", "room shell", "navigation", "audio utility"],
+    "waived": [],
+    "status": "static validation pending in local terminal"
+  }
+]
